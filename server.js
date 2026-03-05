@@ -6,19 +6,20 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+// مصفوفة صورك الخاصة (Direct Links)
 const allImages = [
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com"
+    "https://i.postimg.cc",
+    "https://i.postimg.cc",
+    "https://i.postimg.cc",
+    "https://i.postimg.cc",
+    "https://i.postimg.cc",
+    "https://i.postimg.cc",
+    "https://i.postimg.cc",
+    "https://i.postimg.cc",
+    "https://i.postimg.cc",
+    "https://i.postimg.cc",
+    "https://i.postimg.cc",
+    "https://i.postimg.cc"
 ];
 
 let players = [], scores = {}, playerNames = {}, hostId = null;
@@ -93,9 +94,9 @@ io.on('connection', (socket) => {
         
         players.forEach(pId => {
             if (pId !== currentDrawerId) {
-                const playerImages = allImages.sort(() => 0.5 - Math.random()).slice(0, 12);
+                const pImages = allImages.sort(() => 0.5 - Math.random()).slice(0, 12);
                 const pSocketId = Object.keys(socketToUserId).find(k => socketToUserId[k] === pId);
-                if (pSocketId) io.to(pSocketId).emit('showClue', { clue: currentClue, pImages: playerImages, drawerName: playerNames[currentDrawerId] });
+                if (pSocketId) io.to(pSocketId).emit('showClue', { clue: currentClue, pImages, drawerName: playerNames[currentDrawerId] });
             }
         });
         startTimer(60, () => proceedToVoting());
@@ -112,11 +113,8 @@ io.on('connection', (socket) => {
     function proceedToVoting() {
         gameState = "VOTING"; guessesReceived = 0;
         let allOptions = [correctImage];
-        for (let id in fakeImages) {
-            allOptions.push(fakeImages[id]);
-        }
+        for (let id in fakeImages) allOptions.push(fakeImages[id]);
         let finalOptions = [...new Set(allOptions)].sort(() => 0.5 - Math.random());
-        
         io.emit('startVoting', { options: finalOptions, drawerId: currentDrawerId });
         startTimer(60, () => finalizeRound());
     }
@@ -131,14 +129,12 @@ io.on('connection', (socket) => {
 
     function finalizeRound() {
         gameState = "RESULTS"; calculateScores(); emitPlayerList();
-        
         let voteDetails = {};
         for (let vId in votes) {
-            const voteKey = votes[vId];
-            if (!voteDetails[voteKey]) voteDetails[voteKey] = [];
-            voteDetails[voteKey].push(playerNames[vId]);
+            const img = votes[vId];
+            if (!voteDetails[img]) voteDetails[img] = [];
+            voteDetails[img].push(playerNames[vId]);
         }
-
         io.emit('roundFinished', { correctImage, scores, voteDetails });
         setTimeout(() => {
             if (currentRound < totalRounds && players.length > 0) { currentRound++; startNewRound(); } 
@@ -180,4 +176,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Image Game (Single) Online on port ${PORT}`));
+server.listen(PORT, () => console.log(`Image Game Server Running on port ${PORT}`));
