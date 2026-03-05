@@ -23,32 +23,43 @@
         #status-msg { margin-top: 15px; color: #94a3b8; font-style: italic; min-height: 1.5em; }
         .vote-item { background: #1a1a1a; padding: 10px; border-radius: 8px; margin-top: 10px; border-right: 5px solid #2563eb; text-align: right; }
         input { padding:12px; background:#1a1a1a; color:#fff; border:1px solid #444; border-radius:8px; width: 250px; text-align: center; font-size: 1em; }
+        #leaderboard-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:center; z-index:100; }
     </style>
 </head>
 <body>
 
 <div class="box">
     <div id="player-bar" class="hidden"></div>
+    
+    <!-- شاشة الدخول -->
     <div id="name-screen">
         <h1>لعبة الروابط: الصور 🖼️</h1>
         <input type="text" id="nick" placeholder="اكتب اسمك المستعار...">
         <br><br><button onclick="join()">دخول اللعبة</button>
     </div>
 
+    <!-- شاشة الانتظار -->
     <div id="lobby-screen" class="hidden">
         <div id="host-controls" class="hidden">
-            <select id="rounds-count" style="background:#222; color:#fff; padding:8px; border-radius:5px;"><option value="5">5 جولات</option><option value="10">10 جولات</option></select>
+            <select id="rounds-count" style="background:#222; color:#fff; padding:8px; border-radius:5px;">
+                <option value="5">5 جولات</option>
+                <option value="10">10 جولات</option>
+            </select>
             <br><br><button onclick="startGame()">ابدأ الجولة 🚀</button>
         </div>
         <p id="wait-msg">بانتظار المضيف لبدء اللعبة...</p>
     </div>
 
+    <!-- شاشة اللعبة -->
     <div id="game-screen" class="hidden">
         <div id="timer">60</div>
         <div id="clue-display"></div>
         <div class="grid" id="grid"></div>
         <div id="controls">
-            <div id="draw-ctrl" class="hidden"><input type="text" id="clue-in" placeholder="اكتب الرابط السري..."><br><br><button onclick="sendAction('submitClue')">إرسال التلميح</button></div>
+            <div id="draw-ctrl" class="hidden">
+                <input type="text" id="clue-in" placeholder="اكتب الرابط السري...">
+                <br><br><button onclick="sendAction('submitClue')">إرسال التلميح</button>
+            </div>
             <div id="fake-ctrl" class="hidden"><button onclick="sendAction('submitFake')" style="background:#9333ea;">تأكيد التضليل</button></div>
             <div id="vote-ctrl" class="hidden"><button onclick="sendAction('submitVote')" style="background:#10b981;">تأكيد التصويت</button></div>
         </div>
@@ -57,8 +68,9 @@
     </div>
 </div>
 
+<!-- شاشة النتائج النهائية -->
 <div id="leaderboard-overlay" class="hidden">
-    <div style="background:#111; padding:30px; border-radius:20px; border:2px solid #2563eb; width:280px; box-shadow: 0 0 50px rgba(0,0,0,1);">
+    <div style="background:#111; padding:30px; border-radius:20px; border:2px solid #2563eb; width:280px;">
         <h2>النتائج النهائية 🏆</h2>
         <div id="final-list" style="margin:20px 0; font-size: 1.2em;"></div>
         <button onclick="location.reload()">لعبة جديدة</button>
@@ -80,8 +92,40 @@
         document.getElementById('lobby-screen').classList.remove('hidden');
     }
 
-    window.onload = () => { if(localStorage.getItem('game_user_name')) { document.getElementById('nick').value = localStorage.getItem('game_user_name'); join(); } };
     function startGame() { socket.emit('requestStart', { rounds: document.getElementById('rounds-count').value }); }
+
+    function render(images, isClickable) {
+        const grid = document.getElementById('grid');
+        grid.innerHTML = "";
+        images.forEach(imgUrl => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `<img src="${imgUrl}">`;
+            if (isClickable) {
+                card.onclick = () => {
+                    document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                    selectedImg = imgUrl;
+                };
+            }
+            grid.appendChild(card);
+        });
+    }
+
+    function sendAction(type) {
+        if (!selectedImg && type !== 'submitClue') return alert("اختر صورة أولاً!");
+        if (type === 'submitClue') {
+            const clue = document.getElementById('clue-in').value;
+            if (!clue || !selectedImg) return alert("اختر صورة واكتب تلميحاً!");
+            socket.emit('submitClue', { clue, image: selectedImg });
+        } else {
+            socket.emit(type, selectedImg);
+        }
+        document.getElementById('draw-ctrl').classList.add('hidden');
+        document.getElementById('fake-ctrl').classList.add('hidden');
+        document.getElementById('vote-ctrl').classList.add('hidden');
+        selectedImg = null;
+    }
 
     socket.on('updatePlayerList', d => {
         const bar = document.getElementById('player-bar'); bar.innerHTML = "";
@@ -103,14 +147,14 @@
         document.getElementById('game-screen').classList.remove('hidden');
         document.getElementById('clue-display').innerText = (myId === d.drawerId) ? "أنت المشفر: اختر صورة واحدة وضع الرابط" : `بانتظار ${d.drawerName} يضع لغزه...`;
         document.getElementById('draw-ctrl').className = (myId === d.drawerId) ? "" : "hidden";
-        render(d.images, (myId !== d.drawerId));
+        render(d.images, (myId === d.drawerId));
     });
 
     socket.on('showClue', d => {
         document.getElementById('clue-display').innerHTML = `<small style="font-size:0.5em; display:block; color:#666;">المشفر: ${d.drawerName}</small>الرابط: ${d.clue}`;
         if(myId !== currentDrawerId) {
             document.getElementById('fake-ctrl').classList.remove('hidden');
-            render(d.pImages, false);
+            render(d.pImages, true);
         } else {
             document.getElementById('status-msg').innerText = "اللاعبون يختارون صورة التضليل الآن...";
         }
@@ -120,7 +164,7 @@
         document.getElementById('fake-ctrl').classList.add('hidden');
         document.getElementById('clue-display').innerText = (myId === d.drawerId) ? "اللاعبون يصوتون الآن..." : "أي صورة اختارها المشفر؟";
         if(myId !== d.drawerId) document.getElementById('vote-ctrl').classList.remove('hidden');
-        render(d.options, (myId === d.drawerId));
+        render(d.options, (myId !== d.drawerId));
     });
 
     socket.on('roundFinished', d => {
@@ -137,33 +181,12 @@
 
     socket.on('gameOver', d => {
         document.getElementById('leaderboard-overlay').classList.remove('hidden');
-        document.getElementById('final-list').innerHTML = d.leaderboard.map(p => `<div>${p.name}: ${p.score}</div>`).join('');
+        let html = "";
+        d.leaderboard.forEach(p => html += `<div>${p.name}: ${p.score}</div>`);
+        document.getElementById('final-list').innerHTML = html;
     });
 
-    function render(images, disable) {
-        const g = document.getElementById('grid'); g.innerHTML = ""; selectedImg = null;
-        images.forEach(url => {
-            const d = document.createElement('div'); d.className = 'card';
-            d.innerHTML = `<img src="${url}" onerror="this.src='https://via.placeholder.com'">`;
-            d.onclick = () => { if(!disable) { 
-                document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
-                d.classList.add('selected');
-                selectedImg = url;
-            }};
-            g.appendChild(d);
-        });
-    }
-
-    function sendAction(ev) {
-        if(!selectedImg) return alert("اختر صورة أولاً!");
-        if(ev === 'submitClue' && !document.getElementById('clue-in').value.trim()) return alert("اكتب الرابط!");
-        
-        const payload = (ev === 'submitClue') ? { clue: document.getElementById('clue-in').value, image: selectedImg } : selectedImg;
-        socket.emit(ev, payload);
-        
-        document.querySelectorAll('#controls > div').forEach(c => c.classList.add('hidden'));
-        document.getElementById('status-msg').innerText = "تم الإرسال.. بانتظار البقية ⌛";
-    }
+    window.onload = () => { if(localStorage.getItem('game_user_name')) { document.getElementById('nick').value = localStorage.getItem('game_user_name'); } };
 </script>
 </body>
 </html>
