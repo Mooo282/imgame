@@ -2,243 +2,114 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لعبة الروابط (نسخة الصور) 🖼️</title>
-    <script src="/socket.io/socket.io.js"></script>
+    <title>لعبة الروابط - نسخة الصور الخاصة 🖼️</title>
+    <script src="https://cdn.socket.io"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #080808; color: #fff; text-align: center; padding: 10px; margin: 0; overflow-x: hidden; }
-        .box { background: #111; max-width: 850px; margin: 20px auto; padding: 25px; border-radius: 20px; border: 1px solid #333; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
-        
-        #player-bar { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-bottom: 20px; padding: 12px; background: rgba(30,30,30,0.9); border-radius: 12px; border: 1px solid #444; }
-        .p-tag { background: #222; padding: 6px 12px; border-radius: 10px; border: 1px solid #444; display: flex; align-items: center; gap: 8px; font-size: 0.9em; }
-        .p-score { background: #2563eb; color: white; padding: 2px 8px; border-radius: 6px; font-weight: 900; }
-        
-        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 20px 0; }
-        .card { border: 4px solid #222; border-radius: 15px; cursor: pointer; background: #1a1a1a; overflow: hidden; height: 180px; transition: 0.3s; position: relative; }
-        .card img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
-        .card.selected { border-color: #fb923c; transform: scale(1.05); z-index: 10; box-shadow: 0 0 15px rgba(251, 146, 60, 0.5); }
-        .correct-answer { border-color: #10b981 !important; box-shadow: 0 0 25px #10b981; transform: scale(1.05); z-index: 5; }
-        
-        #timer { font-size: 3.5em; color: #ef4444; font-weight: 900; text-shadow: 0 0 10px rgba(239, 68, 68, 0.3); margin-bottom: 10px; }
-        #clue-display { font-size: 1.6em; color: #fb923c; margin: 15px 0; font-weight: bold; min-height: 1.2em; }
-        
-        button { background: #2563eb; color: white; border: none; padding: 12px 28px; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 1.1em; transition: 0.2s; }
-        button:hover { background: #1d4ed8; transform: translateY(-2px); }
-        button:disabled { background: #444; cursor: not-allowed; transform: none; }
-        
-        input { padding: 12px; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 8px; width: 250px; text-align: center; font-size: 1em; margin-bottom: 10px; }
-        .hidden { display: none !important; }
-        
-        #status-msg { margin-top: 15px; color: #94a3b8; font-style: italic; min-height: 1.5em; }
-        #results-area { margin-top: 20px; border-top: 1px solid #333; padding-top: 15px; }
-        .vote-item { background: #1a1a1a; padding: 10px; border-radius: 8px; margin-top: 8px; border-right: 5px solid #2563eb; text-align: right; }
-
-        @media (max-width: 600px) { .grid { grid-template-columns: repeat(2, 1fr); } .card { height: 140px; } }
+        body { background: #0a0a0a; color: #fff; text-align: center; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; }
+        .box { background: #151515; max-width: 700px; margin: auto; padding: 20px; border-radius: 15px; border: 1px solid #333; }
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px 0; }
+        .card { border: 3px solid #333; cursor: pointer; height: 150px; border-radius: 10px; overflow: hidden; transition: 0.2s; }
+        .card img { width: 100%; height: 100%; object-fit: cover; }
+        .selected { border-color: #fb923c !important; transform: scale(1.03); }
+        .correct { border-color: #10b981 !important; box-shadow: 0 0 15px #10b981; }
+        .hidden { display: none; }
+        button { background: #2563eb; color: #fff; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        input { padding: 10px; border-radius: 5px; border: 1px solid #444; background: #222; color: #fff; margin: 5px; }
     </style>
 </head>
 <body>
-
-<div class="box">
-    <div id="player-bar" class="hidden"></div>
-
-   
-    <div id="name-screen">
-        <h1>لعبة الروابط: الصور 🖼️</h1>
-        <input type="text" id="nick" placeholder="اكتب اسمك المستعار..." maxlength="15">
-        <br><button onclick="join()">دخول اللعبة</button>
-    </div>
-
-    
-    <div id="lobby-screen" class="hidden">
-        <div id="host-controls" class="hidden">
-            <label>عدد الجولات:</label>
-            <select id="rounds-count" style="background:#222; color:#fff; padding:8px; border-radius:5px; margin: 10px;">
-                <option value="5">5 جولات</option>
-                <option value="10">10 جولات</option>
-            </select>
-            <br><button onclick="startGame()">ابدأ الجولة 🚀</button>
+    <div class="box">
+        <div id="setup">
+            <h1>لعبة الروابط 🖼️</h1>
+            <input type="text" id="nick" placeholder="اسمك المستعار">
+            <button onclick="join()">دخول اللعبة</button>
         </div>
-        <p id="wait-msg">بانتظار المضيف لبدء اللعبة...</p>
-    </div>
 
-    
-    <div id="game-screen" class="hidden">
-        <div id="timer">60</div>
-        <div id="clue-display"></div>
-        <div class="grid" id="grid"></div>
-        
-        <div id="controls">
-            
-            <div id="draw-ctrl" class="hidden">
-                <input type="text" id="clue-in" placeholder="اكتب الرابط السري (اللغز)...">
-                <br><button onclick="sendAction('submitClue')">إرسال التلميح</button>
-            </div>
-            
-            <div id="fake-ctrl" class="hidden">
-                <button onclick="sendAction('submitFake')" style="background:#9333ea;">تأكيد صورة التضليل</button>
-            </div>
-            
-            <div id="vote-ctrl" class="hidden">
-                <button onclick="sendAction('submitVote')" style="background:#10b981;">تأكيد التصويت النهائي</button>
+        <div id="game" class="hidden">
+            <div id="player-list" style="margin-bottom: 10px; color: #aaa;"></div>
+            <h3 id="clue-display" style="color: #fb923c;"></h3>
+            <div class="grid" id="grid"></div>
+            <div id="controls">
+                <div id="draw-ctrl" class="hidden">
+                    <input type="text" id="clue-in" placeholder="اكتب اللغز هنا...">
+                    <button onclick="sendAction('submitClue')">إرسال اللغز</button>
+                </div>
+                <button id="fake-btn" class="hidden" onclick="sendAction('submitFake')">تأكيد التضليل</button>
+                <button id="vote-btn" class="hidden" onclick="sendAction('submitVote')">تأكيد التصويت</button>
             </div>
         </div>
-        <div id="status-msg"></div>
-        <div id="results-area"></div>
     </div>
-</div>
 
 <script>
     const socket = io();
-    let myId = localStorage.getItem('game_user_id') || ('u_' + Math.random().toString(36).substr(2, 9));
-    localStorage.setItem('game_user_id', myId);
-    
+    const myId = 'u_' + Math.random().toString(36).substr(2, 9);
     let selectedImg = null;
-    let currentDrawerId = null;
-
-    
 
     function join() {
-        const n = document.getElementById('nick').value.trim();
-        if(!n) return alert("يرجى إدخال اسمك!");
-        localStorage.setItem('game_user_name', n);
+        const n = document.getElementById('nick').value;
+        if(!n) return alert("ادخل اسمك");
         socket.emit('joinGame', { userId: myId, name: n });
-        document.getElementById('name-screen').classList.add('hidden');
-        document.getElementById('player-bar').classList.remove('hidden');
-        document.getElementById('lobby-screen').classList.remove('hidden');
+        document.getElementById('setup').classList.add('hidden');
+        document.getElementById('game').classList.remove('hidden');
     }
 
-    function startGame() {
-        const r = document.getElementById('rounds-count').value;
-        socket.emit('requestStart', { rounds: r });
-    }
-
-    function render(images, isClickable) {
-        const grid = document.getElementById('grid');
-        grid.innerHTML = "";
-        selectedImg = null; 
-
-        images.forEach(imgUrl => {
-            const card = document.createElement('div');
-            card.className = 'card';
-            
-            card.innerHTML = `<img src="${imgUrl}" crossorigin="anonymous" onerror="this.src='https://via.placeholder.com'">`;
-            
-            if (isClickable) {
-                card.onclick = () => {
-                    document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
-                    card.classList.add('selected');
-                    selectedImg = imgUrl;
-                };
-            }
-            grid.appendChild(card);
+    function render(imgs, canClick) {
+        const g = document.getElementById('grid'); g.innerHTML = "";
+        imgs.forEach(url => {
+            const d = document.createElement('div'); d.className = 'card';
+            d.innerHTML = `<img src="${url}">`;
+            if(canClick) d.onclick = () => {
+                document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+                d.classList.add('selected'); selectedImg = url;
+            };
+            g.appendChild(d);
         });
     }
 
-    function sendAction(type) {
-        if (!selectedImg) return alert("يرجى اختيار صورة من الشبكة أولاً!");
-        
-        if (type === 'submitClue') {
-            const clueText = document.getElementById('clue-in').value.trim();
-            if (!clueText) return alert("يجب كتابة لغز أو تلميح!");
-            socket.emit('submitClue', { clue: clueText, image: selectedImg });
-            document.getElementById('draw-ctrl').classList.add('hidden');
-        } else if (type === 'submitFake') {
-            socket.emit('submitFake', selectedImg);
-            document.getElementById('fake-ctrl').classList.add('hidden');
-        } else if (type === 'submitVote') {
-            socket.emit('submitVote', selectedImg);
-            document.getElementById('vote-ctrl').classList.add('hidden');
+    function sendAction(ev) {
+        if(!selectedImg) return alert("اختر صورة أولاً!");
+        if(ev === 'submitClue') {
+            const c = document.getElementById('clue-in').value;
+            if(!c) return alert("اكتب لغزاً!");
+            socket.emit(ev, {clue: c, image: selectedImg});
+        } else {
+            socket.emit(ev, selectedImg);
         }
-        
-        document.getElementById('status-msg').innerText = "تم الإرسال.. بانتظار بقية اللاعبين ⏳";
+        selectedImg = null;
+        document.getElementById('draw-ctrl').classList.add('hidden');
+        document.getElementById('fake-btn').classList.add('hidden');
+        document.getElementById('vote-btn').classList.add('hidden');
     }
-
-    
 
     socket.on('updatePlayerList', d => {
-        const bar = document.getElementById('player-bar');
-        bar.innerHTML = "";
-        if(myId === d.hostId && d.gameState === "LOBBY") {
-            document.getElementById('host-controls').classList.remove('hidden');
-            document.getElementById('wait-msg').classList.add('hidden');
-        }
-        d.players.forEach(id => {
-            const tag = document.createElement('div');
-            tag.className = 'p-tag';
-            tag.innerHTML = `<span>${d.playerNames[id]}${id === d.hostId ? " 👑" : ""}</span><span class="p-score">${d.scores[id] || 0}</span>`;
-            bar.appendChild(tag);
-        });
-    });
-
-    socket.on('timerUpdate', t => {
-        document.getElementById('timer').innerText = t;
+        let list = Object.values(d.playerNames).join(" - ");
+        document.getElementById('player-list').innerText = "اللاعبون: " + list;
     });
 
     socket.on('roundStarted', d => {
-        currentDrawerId = d.drawerId;
-        document.getElementById('lobby-screen').classList.add('hidden');
-        document.getElementById('game-screen').classList.remove('hidden');
-        document.getElementById('results-area').innerHTML = "";
-        document.getElementById('status-msg').innerText = "";
-        document.getElementById('clue-in').value = "";
-        
-        const isDrawer = (myId === d.drawerId);
-        document.getElementById('clue-display').innerText = isDrawer ? "أنت المشفر: اختر صورة وضع لغزاً" : `بانتظار ${d.drawerName} لوضع اللغز...`;
-        document.getElementById('draw-ctrl').className = isDrawer ? "" : "hidden";
-        
-        render(d.images, isDrawer); 
+        render(d.images, d.drawerId === myId);
+        document.getElementById('draw-ctrl').className = d.drawerId === myId ? "" : "hidden";
+        document.getElementById('clue-display').innerText = d.drawerId === myId ? "أنت المشفر: اختر صورة وضع لغزاً" : "بانتظار المشفر...";
     });
 
     socket.on('showClue', d => {
-        document.getElementById('clue-display').innerHTML = `<small style="font-size:0.6em; color:#888;">اللغز من ${d.drawerName}:</small><br>${d.clue}`;
-        if (myId !== currentDrawerId) {
-            document.getElementById('fake-ctrl').classList.remove('hidden');
-            document.getElementById('status-msg').innerText = "اختر صورة لتضليل الآخرين!";
-            render(d.pImages, true);
-        } else {
-            document.getElementById('status-msg').innerText = "اللاعبون يختارون صور التضليل حالياً...";
-        }
+        document.getElementById('clue-display').innerText = "اللغز: " + d.clue;
+        document.getElementById('fake-btn').classList.remove('hidden');
+        render(d.pImages, true);
     });
 
     socket.on('startVoting', d => {
-        document.getElementById('fake-ctrl').classList.add('hidden');
         document.getElementById('clue-display').innerText = "أي صورة اختارها المشفر؟";
-        
-        const isDrawer = (myId === d.drawerId);
-        if (!isDrawer) {
-            document.getElementById('vote-ctrl').classList.remove('hidden');
-            document.getElementById('status-msg').innerText = "صوّت للصورة الصحيحة!";
-        } else {
-            document.getElementById('status-msg').innerText = "اللاعبون يصوتون الآن...";
-        }
-        render(d.options, !isDrawer);
+        if(myId !== d.drawerId) document.getElementById('vote-btn').classList.remove('hidden');
+        render(d.options, myId !== d.drawerId);
     });
 
     socket.on('roundFinished', d => {
-        document.getElementById('status-msg').innerHTML = "<b style='color:#10b981;'>انتهت الجولة! كشف الحقيقة:</b>";
-        
-        
-        document.querySelectorAll('.card img').forEach(img => {
-            if (img.src === d.correctImage) {
-                img.parentElement.classList.add('correct-answer');
-            }
+        document.querySelectorAll('.card img').forEach(i => {
+            // نستخدم endsWith للتأكد من مطابقة المسار المحلي
+            if(i.src.endsWith(d.correctImage)) i.parentElement.classList.add('correct');
         });
-
-        if (d.voteDetails) {
-            let html = '<div id="results-area"><h4>أصوات اللاعبين:</h4>';
-            for (let imgUrl in d.voteDetails) {
-                html += `<div class="vote-item">صورة صوّت لها: ${d.voteDetails[imgUrl].join(", ")}</div>`;
-            }
-            document.getElementById('results-area').innerHTML = html + '</div>';
-        }
     });
-
-    
-    window.onload = () => {
-        const savedName = localStorage.getItem('game_user_name');
-        if(savedName) document.getElementById('nick').value = savedName;
-    };
 </script>
-
 </body>
 </html>
