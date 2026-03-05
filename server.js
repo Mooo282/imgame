@@ -6,32 +6,20 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-    cors: { origin: "*" }
+    cors: { origin: "*" } // لضمان عمل الاتصال على Render بدون قيود
 });
 
-
-const allImages = [
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com"
-];
+// روابط صور مستقرة ومتنوعة (Lorem Picsum) لضمان عدم الحظر
+const allImages = Array.from({ length: 30 }, (_, i) => `https://picsum.photos{i + 10}/500/500`);
 
 let players = [], scores = {}, playerNames = {}, hostId = null;
 let currentRound = 0, totalRounds = 0, correctImage = "", currentDrawerId = null;
-let fakeImages = {}, votes = {}, guessesReceived = 0, timer, timeLeft = 60;
-let gameState = "LOBBY";
+let fakeImages = {}, votes = {}, guessesReceived = 0, timer;
+let gameState = "LOBBY"; // LOBBY, DRAWING, FAKING, VOTING, RESULTS
 let socketToUserId = {};
 let drawerQueue = [];
 
+app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 function emitPlayerList() {
@@ -40,7 +28,7 @@ function emitPlayerList() {
 
 function startTimer(duration, onTimeout) {
     clearInterval(timer);
-    timeLeft = duration;
+    let timeLeft = duration;
     io.emit('timerUpdate', timeLeft);
     timer = setInterval(() => {
         timeLeft--;
@@ -53,6 +41,7 @@ function startTimer(duration, onTimeout) {
 }
 
 io.on('connection', (socket) => {
+    // 1. انضمام اللاعب
     socket.on('joinGame', (data) => {
         const uId = data.userId;
         socketToUserId[socket.id] = uId;
@@ -63,61 +52,83 @@ io.on('connection', (socket) => {
         emitPlayerList();
     });
 
+    // 2. بدء اللعبة (للمضيف فقط)
     socket.on('requestStart', (data) => {
         if (socketToUserId[socket.id] === hostId && gameState === "LOBBY") {
-            players.forEach(id => scores[id] = 0);
             totalRounds = parseInt(data.rounds) || 5;
             currentRound = 1;
+            drawerQueue = [...players].sort(() => 0.5 - Math.random());
             startNewRound();
         }
     });
 
     function startNewRound() {
-        gameState = "DRAWING"; guessesReceived = 0; fakeImages = {}; votes = {};
+        gameState = "DRAWING";
+        guessesReceived = 0;
+        fakeImages = {};
+        votes = {};
+        
         if (drawerQueue.length === 0) drawerQueue = [...players].sort(() => 0.5 - Math.random());
         currentDrawerId = drawerQueue.shift();
+
+        // اختيار 9 صور عشوائية للجولة
+        const roundImages = [...allImages].sort(() => 0.5 - Math.random()).slice(0, 9);
         
-        let currentImages = [...allImages].sort(() => 0.5 - Math.random()).slice(0, 9);
         io.emit('roundStarted', { 
-            images: currentImages, 
+            images: roundImages, 
             drawerId: currentDrawerId, 
-            drawerName: playerNames[currentDrawerId], 
-            currentRound, 
-            totalRounds 
+            drawerName: playerNames[currentDrawerId],
+            currentRound 
         });
+        
         startTimer(60, () => { if(gameState === "DRAWING") startNewRound(); });
     }
 
+    // 3. إرسال التلميح (المشفر)
     socket.on('submitClue', (data) => {
         if (socketToUserId[socket.id] !== currentDrawerId) return;
         correctImage = data.image;
         gameState = "FAKING";
+        
         players.forEach(pId => {
             if (pId !== currentDrawerId) {
                 const pImages = [...allImages].sort(() => 0.5 - Math.random()).slice(0, 9);
                 const sid = Object.keys(socketToUserId).find(k => socketToUserId[k] === pId);
-                if(sid) io.to(sid).emit('showClue', { clue: data.clue, pImages, drawerName: playerNames[currentDrawerId] });
+                if(sid) io.to(sid).emit('showClue', { 
+                    clue: data.clue, 
+                    pImages: pImages, 
+                    drawerName: playerNames[currentDrawerId] 
+                });
             }
         });
-        startTimer(60);
+        startTimer(60, () => proceedToVoting());
     });
 
+    // 4. إرسال صورة التضليل (بقية اللاعبين)
     socket.on('submitFake', (image) => {
-        fakeImages[socketToUserId[socket.id]] = image;
+        const uId = socketToUserId[socket.id];
+        if (uId === currentDrawerId || fakeImages[uId]) return;
+        fakeImages[uId] = image;
         guessesReceived++;
         if (guessesReceived >= (players.length - 1)) proceedToVoting();
     });
 
     function proceedToVoting() {
-        gameState = "VOTING"; guessesReceived = 0;
+        gameState = "VOTING";
+        guessesReceived = 0;
+        // دمج الصورة الصحيحة مع صور التضليل
         let options = [correctImage, ...Object.values(fakeImages)];
         let finalOptions = [...new Set(options)].sort(() => 0.5 - Math.random());
+        
         io.emit('startVoting', { options: finalOptions, drawerId: currentDrawerId });
-        startTimer(60);
+        startTimer(60, () => finalizeRound());
     }
 
+    // 5. التصويت النهائي
     socket.on('submitVote', (votedImage) => {
-        votes[socketToUserId[socket.id]] = votedImage;
+        const uId = socketToUserId[socket.id];
+        if (uId === currentDrawerId || votes[uId]) return;
+        votes[uId] = votedImage;
         guessesReceived++;
         if (guessesReceived >= (players.length - 1)) finalizeRound();
     });
@@ -125,23 +136,49 @@ io.on('connection', (socket) => {
     function finalizeRound() {
         gameState = "RESULTS";
         let voteDetails = {};
-        for(let id in votes) {
-            const img = votes[id];
-            if(!voteDetails[img]) voteDetails[img] = [];
-            voteDetails[img].push(playerNames[id]);
-            if(img === correctImage) { 
-                scores[id] += 10; 
-                scores[currentDrawerId] += 5; 
+        
+        // حساب النقاط
+        for (let vId in votes) {
+            const img = votes[vId];
+            if (!voteDetails[img]) voteDetails[img] = [];
+            voteDetails[img].push(playerNames[vId]);
+            
+            if (img === correctImage) {
+                scores[vId] += 10; // المصوت صحيحاً
+                scores[currentDrawerId] += 5; // المشفر الناجح
+            } else {
+                // اللاعب الذي نجح في التضليل
+                for (let fId in fakeImages) {
+                    if (fakeImages[fId] === img) scores[fId] += 7;
+                }
             }
         }
+
         emitPlayerList();
-        io.emit('roundFinished', { correctImage, scores, voteDetails });
+        io.emit('roundFinished', { correctImage, voteDetails });
+
         setTimeout(() => {
-            if (currentRound < totalRounds) { currentRound++; startNewRound(); }
-            else { io.emit('gameOver', { leaderboard: players.map(id => ({name: playerNames[id], score: scores[id]})).sort((a,b)=>b.score-a.score) }); }
+            if (currentRound < totalRounds) {
+                currentRound++;
+                startNewRound();
+            } else {
+                const leaderboard = players.map(id => ({ name: playerNames[id], score: scores[id] })).sort((a, b) => b.score - a.score);
+                io.emit('gameOver', { leaderboard });
+                gameState = "LOBBY";
+            }
         }, 8000);
     }
+
+    socket.on('disconnect', () => {
+        const uId = socketToUserId[socket.id];
+        if (uId) {
+            players = players.filter(id => id !== uId);
+            if (uId === hostId) hostId = players.length > 0 ? players[0] : null;
+            delete socketToUserId[socket.id];
+            emitPlayerList();
+        }
+    });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
