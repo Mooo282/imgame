@@ -6,8 +6,10 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// روابط صور سريالية عالمية مستقرة (Direct Links من Unsplash)
+// روابط صور سريالية وفنية متنوعة (مباشرة لضمان الظهور)
 const allImages = [
+    "https://images.unsplash.com",
+    "https://images.unsplash.com",
     "https://images.unsplash.com",
     "https://images.unsplash.com",
     "https://images.unsplash.com",
@@ -62,6 +64,13 @@ io.on('connection', (socket) => {
         emitPlayerList();
     });
 
+    socket.on('sendChat', (msg) => {
+        const uId = socketToUserId[socket.id];
+        if (msg && msg.trim()) {
+            io.emit('newChat', { sender: playerNames[uId], text: msg, color: uId === currentDrawerId ? "#fb923c" : "#2563eb" });
+        }
+    });
+
     socket.on('requestStart', (data) => {
         if (socketToUserId[socket.id] === hostId && gameState === "LOBBY") {
             players.forEach(id => scores[id] = 0); 
@@ -81,7 +90,7 @@ io.on('connection', (socket) => {
             return finishGame();
         }
 
-        currentImages = allImages.sort(() => 0.5 - Math.random()).slice(0, 12);
+        currentImages = allImages.sort(() => 0.5 - Math.random()).slice(0, 9);
         io.emit('roundStarted', { images: currentImages, drawerId: currentDrawerId, drawerName: playerNames[currentDrawerId], currentRound, totalRounds });
         startTimer(60, () => { if(gameState === "DRAWING") startNewRound(); });
     }
@@ -94,7 +103,8 @@ io.on('connection', (socket) => {
         
         players.forEach(pId => {
             if (pId !== currentDrawerId) {
-                const pImages = allImages.sort(() => 0.5 - Math.random()).slice(0, 12);
+                const filteredImages = allImages.filter(img => img !== correctImage);
+                const pImages = filteredImages.sort(() => 0.5 - Math.random()).slice(0, 9);
                 const pSocketId = Object.keys(socketToUserId).find(k => socketToUserId[k] === pId);
                 if (pSocketId) io.to(pSocketId).emit('showClue', { clue: currentClue, pImages, drawerName: playerNames[currentDrawerId] });
             }
@@ -105,6 +115,7 @@ io.on('connection', (socket) => {
     socket.on('submitFake', (image) => {
         const uId = socketToUserId[socket.id];
         if (uId === currentDrawerId || fakeImages[uId] || gameState !== "FAKING") return;
+        if (image === correctImage) return; // منع التضليل بنفس الصورة الصحيحة
         fakeImages[uId] = image; 
         guessesReceived++;
         if (guessesReceived >= (players.length - 1)) proceedToVoting();
@@ -139,7 +150,7 @@ io.on('connection', (socket) => {
         setTimeout(() => {
             if (currentRound < totalRounds && players.length > 0) { currentRound++; startNewRound(); } 
             else { finishGame(); }
-        }, 10000); 
+        }, 8000); 
     }
 
     function calculateScores() {
@@ -166,6 +177,7 @@ io.on('connection', (socket) => {
         if (uId) {
             disconnectTimeouts[uId] = setTimeout(() => {
                 players = players.filter(id => id !== uId);
+                if (uId === currentDrawerId && gameState !== "LOBBY") startNewRound();
                 if (uId === hostId) hostId = players.length > 0 ? players[0] : null;
                 delete playerNames[uId]; delete scores[uId];
                 emitPlayerList();
@@ -176,4 +188,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Stable Image Game Running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Image Game Running on port ${PORT}`));
