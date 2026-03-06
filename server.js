@@ -1,25 +1,19 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// روابط صور مباشرة ومستقرة تماماً (تنتهي بـ .jpg) لضمان العرض
+// --- السطر الأهم: جعل مجلد public متاحاً للصور ---
+app.use(express.static('public'));
+
+// مسارات الصور المحلية داخل مجلد public/images
 const allImages = [
-    "https://cdn.pixabay.com",
-    "https://cdn.pixabay.com",
-    "https://cdn.pixabay.com",
-    "https://cdn.pixabay.com",
-    "https://cdn.pixabay.com",
-    "https://cdn.pixabay.com",
-    "https://cdn.pixabay.com",
-    "https://cdn.pixabay.com",
-    "https://cdn.pixabay.com",
-    "https://cdn.pixabay.com",
-    "https://cdn.pixabay.com",
-    "https://cdn.pixabay.com"
+    "/images/1.jpg", "/images/2.jpg", "/images/3.jpg", "/images/4.jpg", "/images/5.jpg",
+    "/images/6.jpg", "/images/7.jpg", "/images/8.jpg", "/images/9.jpg", "/images/10.jpg"
 ];
 
 let players = [], scores = {}, playerNames = {}, hostId = null;
@@ -43,10 +37,7 @@ function startTimer(duration, onTimeout) {
     timer = setInterval(() => {
         timeLeft--;
         io.emit('timerUpdate', timeLeft);
-        if (timeLeft <= 0) { 
-            clearInterval(timer); 
-            if (onTimeout) onTimeout(); 
-        }
+        if (timeLeft <= 0) { clearInterval(timer); if (onTimeout) onTimeout(); }
     }, 1000);
 }
 
@@ -82,23 +73,18 @@ io.on('connection', (socket) => {
         gameState = "DRAWING"; guessesReceived = 0; fakeImages = {}; votes = {}; currentClue = "";
         if (drawerQueue.length === 0) drawerQueue = [...players].sort(() => 0.5 - Math.random());
         currentDrawerId = drawerQueue.shift();
-        
         if (!players.includes(currentDrawerId)) {
             if (players.length > 0) return startNewRound();
             return finishGame();
         }
-
         currentImages = allImages.sort(() => 0.5 - Math.random()).slice(0, 9);
         io.emit('roundStarted', { images: currentImages, drawerId: currentDrawerId, drawerName: playerNames[currentDrawerId], currentRound, totalRounds });
         startTimer(60, () => { if(gameState === "DRAWING") startNewRound(); });
     }
 
     socket.on('submitClue', (data) => {
-        if (socketToUserId[socket.id] !== currentDrawerId || !data.clue || !data.clue.trim()) return;
-        gameState = "FAKING"; 
-        correctImage = data.image; 
-        currentClue = data.clue;
-        
+        if (socketToUserId[socket.id] !== currentDrawerId || !data.clue) return;
+        gameState = "FAKING"; correctImage = data.image; currentClue = data.clue;
         players.forEach(pId => {
             if (pId !== currentDrawerId) {
                 const filteredImages = allImages.filter(img => img !== correctImage);
@@ -153,13 +139,8 @@ io.on('connection', (socket) => {
     function calculateScores() {
         for (let voterId in votes) {
             const vote = votes[voterId];
-            if (vote === correctImage) {
-                scores[voterId] += 10; scores[currentDrawerId] += 5;
-            } else {
-                for (let fId in fakeImages) {
-                    if (fId !== voterId && vote === fakeImages[fId]) scores[fId] += 7;
-                }
-            }
+            if (vote === correctImage) { scores[voterId] += 10; scores[currentDrawerId] += 5; } 
+            else { for (let fId in fakeImages) { if (fId !== voterId && vote === fakeImages[fId]) scores[fId] += 7; } }
         }
     }
 
@@ -175,7 +156,7 @@ io.on('connection', (socket) => {
             disconnectTimeouts[uId] = setTimeout(() => {
                 players = players.filter(id => id !== uId);
                 if (uId === currentDrawerId && gameState !== "LOBBY") startNewRound();
-                if (uId === hostId) hostId = players.length > 0 ? players : null;
+                if (uId === hostId) hostId = players.length > 0 ? players[0] : null;
                 delete playerNames[uId]; delete scores[uId];
                 emitPlayerList();
             }, 10000);
@@ -185,4 +166,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Stable Image Game running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Local Image Game running on port ${PORT}`));
