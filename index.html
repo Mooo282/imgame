@@ -3,33 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لعبة الروابط (نسخة الصور) 🖼️</title>
+    <title>الرابط العجيب: الصور 🖼️</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         :root { --bg: #0a0a0c; --card-bg: #16161e; --primary: #2563eb; --accent: #fb923c; --success: #10b981; --error: #ef4444; --text: #f8fafc; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); text-align: center; padding: 10px; margin: 0; }
-        .main-wrapper { display: flex; max-width: 1200px; margin: 10px auto; gap: 15px; flex-wrap: wrap; justify-content: center; }
-        .box { background: var(--card-bg); flex: 2; min-width: 350px; padding: 25px; border-radius: 20px; border: 1px solid #333; }
-        #chat-box { flex: 1; min-width: 300px; height: 600px; background: var(--card-bg); border-radius: 20px; border: 1px solid #333; display: flex; flex-direction: column; overflow: hidden; }
+        .main-wrapper { display: flex; max-width: 1100px; margin: 15px auto; gap: 15px; flex-wrap: wrap; justify-content: center; }
+        .box { background: var(--card-bg); flex: 2; min-width: 320px; padding: 25px; border-radius: 20px; border: 1px solid #333; }
+        #chat-box { flex: 1; min-width: 280px; height: 550px; background: var(--card-bg); border-radius: 20px; border: 1px solid #333; display: flex; flex-direction: column; overflow: hidden; }
         
         #player-bar { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 20px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 12px; }
         .p-tag { background: #222; padding: 5px 10px; border-radius: 8px; border: 1px solid #444; display: flex; align-items: center; gap: 6px; font-size: 0.9em; }
-        .p-score { background: var(--primary); color: white; padding: 2px 6px; border-radius: 5px; font-weight: 900; }
+        .p-score { background: var(--primary); color: white; padding: 1px 6px; border-radius: 5px; font-weight: bold; }
         
         .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 15px 0; }
-        .card { border: 4px solid #222; border-radius: 12px; cursor: pointer; background: #1a1a1a; overflow: hidden; height: 160px; transition: 0.2s; position: relative; }
-        .card img { width: 100%; height: 100%; object-fit: cover; }
-        .card.selected { border-color: var(--accent); transform: scale(1.02); }
-        .correct-answer { border-color: var(--success) !important; box-shadow: 0 0 20px var(--success); }
+        .card { border: 3px solid #222; border-radius: 12px; cursor: pointer; background: #000; overflow: hidden; height: 150px; transition: 0.2s; }
+        .card img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+        .card.selected { border-color: var(--accent); transform: scale(1.03); z-index: 5; }
+        .correct-answer { border-color: var(--success) !important; box-shadow: 0 0 15px var(--success); }
 
         #timer { font-size: 3em; color: var(--error); font-weight: 900; }
-        #clue-display { font-size: 1.8em; color: var(--accent); margin: 15px 0; font-weight: bold; }
-        button { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        input { padding:10px; background:#1a1a1a; color:#fff; border:1px solid #444; border-radius:8px; width: 80%; text-align: center; }
+        #clue-display { font-size: 1.6em; color: var(--accent); margin: 15px 0; font-weight: bold; }
+        button { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        input[type="text"] { padding:10px; background:#0a0a0c; color:#fff; border:1px solid #444; border-radius:8px; width: 80%; text-align: center; }
 
-        #chat-messages { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; text-align: right; }
+        #chat-messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; text-align: right; }
         .msg { background: rgba(255,255,255,0.03); padding: 8px; border-radius: 8px; font-size: 0.85em; border-right: 3px solid var(--primary); }
-        .msg b { color: var(--primary); display: block; font-size: 0.8em; }
+        .msg b { color: var(--primary); display: block; font-size: 0.75em; }
         .hidden { display: none !important; }
         #leaderboard-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 100; }
     </style>
@@ -41,15 +41,15 @@
         <div id="player-bar" class="hidden"></div>
         
         <div id="name-screen">
-            <h1>لعبة الروابط: الصور 🖼️</h1>
-            <input type="text" id="nick" placeholder="اسمك المستعار..."><br><br>
-            <button onclick="join()">دخول</button>
+            <h1>رابط الصور 🖼️</h1>
+            <input type="text" id="nick" placeholder="اكتب اسمك المستعار..." maxlength="12"><br><br>
+            <button onclick="join()">ابدأ الآن</button>
         </div>
 
         <div id="lobby-screen" class="hidden">
             <div id="host-controls" class="hidden">
-                <select id="rounds-count" style="background:#222; color:#fff; padding:5px;"><option value="5">5 جولات</option><option value="10">10 جولات</option></select><br><br>
-                <button onclick="startGame()">ابدأ الآن</button>
+                <select id="rounds-count" style="background:#222; color:#fff; padding:5px; border-radius:5px;"><option value="5">5 جولات</option><option value="10">10 جولات</option></select><br><br>
+                <button onclick="startGame()">انطلاق 🚀</button>
             </div>
             <p id="wait-msg">بانتظار المضيف...</p>
         </div>
@@ -59,7 +59,7 @@
             <div id="clue-display"></div>
             <div class="grid" id="grid"></div>
             <div id="controls">
-                <div id="draw-ctrl" class="hidden"><input type="text" id="clue-in" placeholder="اكتب الرابط..."><br><br><button onclick="sendAction('submitClue')">إرسال التلميح</button></div>
+                <div id="draw-ctrl" class="hidden"><input type="text" id="clue-in" placeholder="اكتب التلميح هنا..."><br><br><button onclick="sendAction('submitClue')">إرسال التلميح</button></div>
                 <div id="fake-ctrl" class="hidden"><button onclick="sendAction('submitFake')" style="background:var(--accent);">تأكيد التضليل</button></div>
                 <div id="vote-ctrl" class="hidden"><button onclick="sendAction('submitVote')" style="background:var(--success);">تأكيد التصويت</button></div>
             </div>
@@ -69,20 +69,20 @@
     </div>
 
     <div id="chat-box" class="hidden">
-        <div style="padding: 10px; background: rgba(255,255,255,0.02); border-bottom: 1px solid #333;">الدردشة 💬</div>
+        <div style="padding: 10px; background: rgba(255,255,255,0.02); border-bottom: 1px solid #333; font-weight:bold;">الدردشة 💬</div>
         <div id="chat-messages"></div>
         <div style="padding: 10px; display: flex; gap: 5px;">
-            <input type="text" id="chat-in" placeholder="اكتب..." onkeypress="if(event.key==='Enter') sendChat()">
-            <button onclick="sendChat()">ارسل</button>
+            <input type="text" id="chat-in" placeholder="رسالة..." onkeypress="if(event.key==='Enter') sendChat()">
+            <button onclick="sendChat()" style="padding:5px 10px;">ارسل</button>
         </div>
     </div>
 </div>
 
 <div id="leaderboard-overlay" class="hidden">
-    <div class="box" style="width:250px;">
-        <h2>النتائج 🏆</h2>
-        <div id="final-list"></div><br>
-        <button onclick="location.reload()">جديدة</button>
+    <div class="box" style="width:250px; border:2px solid var(--primary);">
+        <h2>كأس الرابط 🏆</h2>
+        <div id="final-list" style="text-align:right; margin:15px 0;"></div>
+        <button onclick="location.reload()">لعبة جديدة</button>
     </div>
 </div>
 
@@ -130,13 +130,13 @@
         document.getElementById('results-area').innerHTML = "";
         document.getElementById('lobby-screen').classList.add('hidden');
         document.getElementById('game-screen').classList.remove('hidden');
-        document.getElementById('clue-display').innerText = (myId === d.drawerId) ? "أنت المشفر: اختر صورة وضع الرابط" : `بانتظار ${d.drawerName}...`;
+        document.getElementById('clue-display').innerText = (myId === d.drawerId) ? "أنت المشفر: اختر صورة واكتب تلميحاً" : `بانتظار ${d.drawerName}...`;
         document.getElementById('draw-ctrl').className = (myId === d.drawerId) ? "" : "hidden";
         render(d.images, (myId === d.drawerId));
     });
 
     socket.on('showClue', d => {
-        document.getElementById('clue-display').innerHTML = `<small style="font-size:0.5em; color:#666;">المشفر: ${d.drawerName}</small>الرابط: ${d.clue}`;
+        document.getElementById('clue-display').innerHTML = `<small style="font-size:0.5em; color:#888;">المشفر: ${d.drawerName}</small>الرابط: ${d.clue}`;
         if(myId !== currentDrawerId) {
             document.getElementById('fake-ctrl').classList.remove('hidden');
             render(d.pImages, true);
@@ -145,7 +145,7 @@
 
     socket.on('startVoting', d => {
         document.getElementById('fake-ctrl').classList.add('hidden');
-        document.getElementById('clue-display').innerText = (myId === d.drawerId) ? "اللاعبون يصوتون..." : "أي صورة اختارها المشفر؟";
+        document.getElementById('clue-display').innerText = (myId === d.drawerId) ? "اللاعبون يصوتون..." : "اختر الصورة الصحيحة!";
         if(myId !== d.drawerId) document.getElementById('vote-ctrl').classList.remove('hidden');
         render(d.options, (myId !== d.drawerId));
     });
@@ -153,29 +153,31 @@
     socket.on('roundFinished', d => {
         document.getElementById('vote-ctrl').classList.add('hidden');
         document.querySelectorAll('.card img').forEach(img => { if(img.src === d.correctImage) img.parentElement.classList.add('correct-answer'); });
-        let html = ''; for (let img in d.voteDetails) html += `<div style="background:#222; padding:5px; margin:5px; font-size:0.8em;">صوّت لهذه: ${d.voteDetails[img].join(", ")}</div>`;
-        document.getElementById('results-area').innerHTML = html;
+        let html = '<div style="margin-top:10px; font-size:0.85em; color:#aaa;">';
+        for (let img in d.voteDetails) html += `<div>🖼️ صوّت لهذه: ${d.voteDetails[img].join(", ")}</div>`;
+        document.getElementById('results-area').innerHTML = html + '</div>';
     });
 
     socket.on('gameOver', d => {
         document.getElementById('leaderboard-overlay').classList.remove('hidden');
         const l = document.getElementById('final-list'); l.innerHTML = "";
-        d.leaderboard.forEach((p, i) => l.innerHTML += `<div>${i+1}. ${p.name}: ${p.score}</div>`);
+        d.leaderboard.forEach((p, i) => l.innerHTML += `<div>${i+1}. ${p.name}: <b>${p.score}</b></div>`);
     });
 
     function render(images, canSelect) {
         const g = document.getElementById('grid'); g.innerHTML = ""; selectedImg = null;
         images.forEach(url => {
-            const c = document.createElement('div'); c.className = 'card'; c.innerHTML = `<img src="${url}">`;
+            const c = document.createElement('div'); c.className = 'card';
+            c.innerHTML = `<img src="${url}" crossorigin="anonymous" loading="lazy">`;
             if (canSelect) c.onclick = () => { document.querySelectorAll('.card').forEach(x => x.classList.remove('selected')); c.classList.add('selected'); selectedImg = url; };
             g.appendChild(c);
         });
     }
 
     function sendAction(t) {
-        if (!selectedImg) return alert("اختر صورة!");
+        if (!selectedImg) return alert("الرجاء تحديد صورة أولاً!");
         if (t === 'submitClue') {
-            const clue = document.getElementById('clue-in').value; if(!clue) return;
+            const clue = document.getElementById('clue-in').value; if(!clue.trim()) return alert("اكتب التلميح!");
             socket.emit('submitClue', { image: selectedImg, clue });
             document.getElementById('draw-ctrl').classList.add('hidden');
         } else if (t === 'submitFake') {

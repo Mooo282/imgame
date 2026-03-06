@@ -6,22 +6,20 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// روابط صور سريالية وفنية متنوعة (مباشرة لضمان الظهور)
+// روابط صور مباشرة ومستقرة تماماً (تنتهي بـ .jpg) لضمان العرض
 const allImages = [
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com",
-    "https://images.unsplash.com"
+    "https://cdn.pixabay.com",
+    "https://cdn.pixabay.com",
+    "https://cdn.pixabay.com",
+    "https://cdn.pixabay.com",
+    "https://cdn.pixabay.com",
+    "https://cdn.pixabay.com",
+    "https://cdn.pixabay.com",
+    "https://cdn.pixabay.com",
+    "https://cdn.pixabay.com",
+    "https://cdn.pixabay.com",
+    "https://cdn.pixabay.com",
+    "https://cdn.pixabay.com"
 ];
 
 let players = [], scores = {}, playerNames = {}, hostId = null;
@@ -114,8 +112,7 @@ io.on('connection', (socket) => {
 
     socket.on('submitFake', (image) => {
         const uId = socketToUserId[socket.id];
-        if (uId === currentDrawerId || fakeImages[uId] || gameState !== "FAKING") return;
-        if (image === correctImage) return; // منع التضليل بنفس الصورة الصحيحة
+        if (uId === currentDrawerId || fakeImages[uId] || gameState !== "FAKING" || image === correctImage) return;
         fakeImages[uId] = image; 
         guessesReceived++;
         if (guessesReceived >= (players.length - 1)) proceedToVoting();
@@ -178,7 +175,7 @@ io.on('connection', (socket) => {
             disconnectTimeouts[uId] = setTimeout(() => {
                 players = players.filter(id => id !== uId);
                 if (uId === currentDrawerId && gameState !== "LOBBY") startNewRound();
-                if (uId === hostId) hostId = players.length > 0 ? players[0] : null;
+                if (uId === hostId) hostId = players.length > 0 ? players : null;
                 delete playerNames[uId]; delete scores[uId];
                 emitPlayerList();
             }, 10000);
@@ -188,4 +185,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Image Game Running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Stable Image Game running on port ${PORT}`));
