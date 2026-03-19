@@ -3,77 +3,221 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>رابط الصور المحلي 🖼️</title>
+    <title>لعبة الروابط 🖼️</title>
+    <link href="https://fonts.googleapis.com" rel="stylesheet">
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        :root { --bg: #0a0a0c; --card-bg: #16161e; --primary: #2563eb; --accent: #fb923c; --success: #10b981; --error: #ef4444; --text: #f8fafc; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); text-align: center; padding: 10px; margin: 0; }
-        .main-wrapper { display: flex; max-width: 1100px; margin: 15px auto; gap: 15px; flex-wrap: wrap; justify-content: center; }
-        .box { background: var(--card-bg); flex: 2; min-width: 320px; padding: 25px; border-radius: 20px; border: 1px solid #333; }
-        #chat-box { flex: 1; min-width: 280px; height: 550px; background: var(--card-bg); border-radius: 20px; border: 1px solid #333; display: flex; flex-direction: column; overflow: hidden; }
-        #player-bar { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 20px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 12px; }
-        .p-tag { background: #222; padding: 5px 10px; border-radius: 8px; border: 1px solid #444; display: flex; align-items: center; gap: 6px; font-size: 0.9em; }
-        .p-score { background: var(--primary); color: white; padding: 1px 6px; border-radius: 5px; font-weight: bold; }
-        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 15px 0; }
-        .card { border: 3px solid #222; border-radius: 12px; cursor: pointer; background: #000; overflow: hidden; height: 150px; transition: 0.2s; }
-        .card img { width: 100%; height: 100%; object-fit: cover; }
-        .card.selected { border-color: var(--accent); transform: scale(1.03); z-index: 5; }
-        .correct-answer { border-color: var(--success) !important; box-shadow: 0 0 15px var(--success); }
-        #timer { font-size: 3em; color: var(--error); font-weight: 900; }
-        #clue-display { font-size: 1.6em; color: var(--accent); margin: 15px 0; font-weight: bold; }
-        button { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        input[type="text"] { padding:10px; background:#0a0a0c; color:#fff; border:1px solid #444; border-radius:8px; width: 80%; text-align: center; }
-        #chat-messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; text-align: right; }
-        .msg { background: rgba(255,255,255,0.03); padding: 8px; border-radius: 8px; font-size: 0.85em; border-right: 3px solid var(--primary); }
-        .msg b { color: var(--primary); display: block; font-size: 0.75em; }
+        :root {
+            --bg: #0b0e14;
+            --card-bg: #1a1f2e;
+            --primary: #4f46e5;
+            --secondary: #ec4899;
+            --text-main: #ffffff;
+            --text-dim: #94a3b8;
+            --success: #22c55e;
+        }
+        * { box-sizing: border-box; transition: all 0.3s ease; }
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: var(--bg);
+            background-image: radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.15) 0px, transparent 50%),
+                              radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.15) 0px, transparent 50%);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .main-container {
+            width: 95%;
+            max-width: 1200px;
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+            height: 90vh;
+        }
+        @media (max-width: 900px) {
+            .main-container { grid-template-columns: 1fr; height: auto; }
+            #chat-box { height: 400px !important; }
+        }
+        #name-screen {
+            position: fixed;
+            inset: 0;
+            background: var(--bg);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .login-card {
+            background: var(--card-bg);
+            padding: 40px;
+            border-radius: 30px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.05);
+            width: 90%;
+            max-width: 400px;
+        }
+        .modern-input {
+            width: 100%;
+            padding: 15px;
+            border-radius: 15px;
+            border: 2px solid #2d3748;
+            background: #0f172a;
+            color: white;
+            font-size: 1.1em;
+            outline: none;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .modern-input:focus { border-color: var(--primary); box-shadow: 0 0 15px rgba(79, 70, 229, 0.3); }
+        .btn-glow {
+            width: 100%;
+            padding: 15px;
+            border-radius: 15px;
+            border: none;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            font-weight: 800;
+            font-size: 1.1em;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        .btn-glow:hover { transform: translateY(-3px); box-shadow: 0 15px 25px rgba(236, 72, 153, 0.3); }
+        .game-area {
+            background: var(--card-bg);
+            border-radius: 30px;
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(255,255,255,0.05);
+            overflow-y: auto;
+        }
+        #player-bar {
+            display: flex;
+            gap: 10px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 20px;
+            overflow-x: auto;
+        }
+        .player-pill {
+            background: #2d3748;
+            padding: 8px 15px;
+            border-radius: 50px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            font-size: 0.85em;
+        }
+        .score-badge { background: var(--secondary); color: white; padding: 2px 8px; border-radius: 8px; font-weight: bold; }
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .image-card {
+            aspect-ratio: 1;
+            border-radius: 20px;
+            overflow: hidden;
+            cursor: pointer;
+            position: relative;
+            border: 4px solid transparent;
+        }
+        .image-card img { width: 100%; height: 100%; object-fit: cover; }
+        .image-card.selected { border-color: var(--primary); transform: scale(0.95); }
+        .image-card.correct { border-color: var(--success); box-shadow: 0 0 20px var(--success); }
+        #chat-box {
+            background: var(--card-bg);
+            border-radius: 30px;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(255,255,255,0.05);
+            overflow: hidden;
+        }
+        .chat-header { padding: 20px; background: rgba(0,0,0,0.2); font-weight: 800; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        #chat-messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .chat-bubble {
+            background: #2d3748;
+            padding: 10px 15px;
+            border-radius: 18px 18px 0 18px;
+            max-width: 85%;
+            align-self: flex-start;
+            font-size: 0.9em;
+            position: relative;
+        }
+        .chat-bubble b { display: block; font-size: 0.7em; color: var(--primary); margin-bottom: 3px; }
+        .chat-input-area { padding: 15px; display: flex; gap: 10px; background: rgba(0,0,0,0.2); }
+        #timer { font-size: 3em; font-weight: 900; color: var(--secondary); margin: 10px 0; }
         .hidden { display: none !important; }
-        #leaderboard-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 100; }
     </style>
 </head>
 <body>
 
-<div class="main-wrapper">
-    <div class="box">
-        <div id="player-bar" class="hidden"></div>
-        <div id="name-screen">
-            <h1>رابط الصور المحلي 🖼️</h1>
-            <input type="text" id="nick" placeholder="اسمك المستعار..."><br><br>
-            <button onclick="join()">ابدأ</button>
-        </div>
+<div id="name-screen">
+    <div class="login-card">
+        <h1 style="margin-top:0">مرحباً بك! 👋</h1>
+        <p style="color: var(--text-dim); margin-bottom: 30px;">ادخل اسمك المستعار لتبدأ اللعب</p>
+        <input type="text" id="nick" class="modern-input" placeholder="مثال: اللاعب المحترف">
+        <button onclick="join()" class="btn-glow">انضمام الآن</button>
+    </div>
+</div>
+
+<div class="main-container">
+    <div class="game-area box">
+        <div id="player-bar"></div>
         <div id="lobby-screen" class="hidden">
             <div id="host-controls" class="hidden">
-                <select id="rounds-count" style="background:#222; color:#fff;"><option value="5">5 جولات</option><option value="10">10 جولات</option></select><br><br>
-                <button onclick="startGame()">انطلاق 🚀</button>
+                <h2>إعدادات الجولة ⚙️</h2>
+                <select id="rounds-count" class="modern-input" style="width: 200px;">
+                    <option value="5">5 جولات</option>
+                    <option value="10">10 جولات</option>
+                </select><br>
+                <button onclick="startGame()" class="btn-glow" style="max-width: 250px;">بدء اللعبة</button>
             </div>
-            <p id="wait-msg">بانتظار المضيف...</p>
+            <p id="wait-msg">بانتظار المضيف للبدء...</p>
         </div>
         <div id="game-screen" class="hidden">
             <div id="timer">60</div>
-            <div id="clue-display"></div>
-            <div class="grid" id="grid"></div>
+            <div id="clue-display" style="font-size: 1.4em; font-weight: 800; color: var(--primary); margin-bottom: 20px;"></div>
+            <div class="image-grid" id="grid"></div>
             <div id="controls">
-                <div id="draw-ctrl" class="hidden"><input type="text" id="clue-in" placeholder="اكتب التلميح..."><br><br><button onclick="sendAction('submitClue')">إرسال</button></div>
-                <div id="fake-ctrl" class="hidden"><button onclick="sendAction('submitFake')" style="background:var(--accent);">تأكيد التضليل</button></div>
-                <div id="vote-ctrl" class="hidden"><button onclick="sendAction('submitVote')" style="background:var(--success);">تأكيد التصويت</button></div>
+                <div id="draw-ctrl" class="hidden">
+                    <input type="text" id="clue-in" class="modern-input" placeholder="اكتب تلميحك هنا...">
+                    <button onclick="sendAction('submitClue')" class="btn-glow" style="max-width: 200px;">إرسال</button>
+                </div>
+                <div id="fake-ctrl" class="hidden">
+                    <button onclick="sendAction('submitFake')" class="btn-glow" style="background: var(--secondary);">تأكيد التضليل</button>
+                </div>
+                <div id="vote-ctrl" class="hidden">
+                    <button onclick="sendAction('submitVote')" class="btn-glow" style="background: var(--success);">تصويت نهائي</button>
+                </div>
             </div>
-            <div id="status-msg" style="margin-top:10px; color:#888;"></div>
             <div id="results-area"></div>
         </div>
     </div>
     <div id="chat-box" class="hidden">
+        <div class="chat-header">المحادثة 💬</div>
         <div id="chat-messages"></div>
-        <div style="padding: 10px; display: flex; gap: 5px;">
-            <input type="text" id="chat-in" placeholder="رسالة..." onkeypress="if(event.key==='Enter') sendChat()">
-            <button onclick="sendChat()">ارسل</button>
+        <div class="chat-input-area">
+            <input type="text" id="chat-in" class="modern-input" style="margin:0; padding:10px;" placeholder="رسالة..." onkeypress="if(event.key==='Enter') sendChat()">
+            <button onclick="sendChat()" class="btn-glow" style="width: 70px; padding: 10px;">ارسل</button>
         </div>
     </div>
 </div>
 
 <div id="leaderboard-overlay" class="hidden">
-    <div class="box" style="width:250px;">
-        <h2>النتائج 🏆</h2>
-        <div id="final-list"></div><br>
-        <button onclick="location.reload()">جديدة</button>
+    <div class="login-card">
+        <h2 style="color: var(--secondary)">النتائج النهائية 🏆</h2>
+        <div id="final-list"></div>
+        <br>
+        <button onclick="location.reload()" class="btn-glow">جولة جديدة</button>
     </div>
 </div>
 
@@ -88,8 +232,6 @@
         localStorage.setItem('game_user_name', n);
         socket.emit('joinGame', { userId: myId, name: n });
         document.getElementById('name-screen').classList.add('hidden');
-        document.getElementById('player-bar').classList.remove('hidden');
-        document.getElementById('lobby-screen').classList.remove('hidden');
         document.getElementById('chat-box').classList.remove('hidden');
     }
 
@@ -99,8 +241,8 @@
 
     socket.on('newChat', d => {
         const c = document.getElementById('chat-messages');
-        const m = document.createElement('div'); m.className = 'msg'; m.style.borderRightColor = d.color;
-        m.innerHTML = `<b style="color:${d.color}">${d.sender}</b>${d.text}`;
+        const m = document.createElement('div'); m.className = 'chat-bubble';
+        m.innerHTML = `<b>${d.sender}</b>${d.text}`;
         c.appendChild(m); c.scrollTop = c.scrollHeight;
     });
 
@@ -108,8 +250,8 @@
         const bar = document.getElementById('player-bar'); bar.innerHTML = "";
         if(myId === d.hostId && d.gameState === "LOBBY") document.getElementById('host-controls').classList.remove('hidden');
         d.players.forEach(id => {
-            const tag = document.createElement('div'); tag.className = 'p-tag';
-            tag.innerHTML = `<span>${d.playerNames[id]}${id === d.hostId ? " 👑" : ""}</span><span class="p-score">${d.scores[id]||0}</span>`;
+            const tag = document.createElement('div'); tag.className = 'player-pill';
+            tag.innerHTML = `<span>${d.playerNames[id]}</span><span class="score-badge">${d.scores[id]||0}</span>`;
             bar.appendChild(tag);
         });
     });
@@ -121,13 +263,13 @@
         document.getElementById('results-area').innerHTML = "";
         document.getElementById('lobby-screen').classList.add('hidden');
         document.getElementById('game-screen').classList.remove('hidden');
-        document.getElementById('clue-display').innerText = (myId === d.drawerId) ? "اختر صورة واكتب تلميحاً" : `بانتظار ${d.drawerName}...`;
+        document.getElementById('clue-display').innerText = (myId === d.drawerId) ? "دورك: اختر صورة واكتب تلميحاً" : `بانتظار تلميح ${d.drawerName}...`;
         document.getElementById('draw-ctrl').className = (myId === d.drawerId) ? "" : "hidden";
         render(d.images, (myId === d.drawerId));
     });
 
     socket.on('showClue', d => {
-        document.getElementById('clue-display').innerHTML = `<small style="font-size:0.5em; color:#888;">المشفر: ${d.drawerName}</small>الرابط: ${d.clue}`;
+        document.getElementById('clue-display').innerText = `التلميح: ${d.clue}`;
         if(myId !== currentDrawerId) {
             document.getElementById('fake-ctrl').classList.remove('hidden');
             render(d.pImages, true);
@@ -143,8 +285,8 @@
 
     socket.on('roundFinished', d => {
         document.getElementById('vote-ctrl').classList.add('hidden');
-        document.querySelectorAll('.card img').forEach(img => { if(img.getAttribute('src') === d.correctImage) img.parentElement.classList.add('correct-answer'); });
-        let html = ''; for (let img in d.voteDetails) html += `<div style="background:#222; padding:3px; margin:2px; font-size:0.8em;">صوّت لهذه: ${d.voteDetails[img].join(", ")}</div>`;
+        document.querySelectorAll('.image-card img').forEach(img => { if(img.getAttribute('src') === d.correctImage) img.parentElement.classList.add('correct'); });
+        let html = ''; for (let img in d.voteDetails) html += `<div style="font-size:0.8em; color:var(--text-dim)">👥 صوتوا لهذه: ${d.voteDetails[img].join(", ")}</div>`;
         document.getElementById('results-area').innerHTML = html;
     });
 
@@ -157,8 +299,8 @@
     function render(images, canSelect) {
         const g = document.getElementById('grid'); g.innerHTML = ""; selectedImg = null;
         images.forEach(url => {
-            const c = document.createElement('div'); c.className = 'card'; c.innerHTML = `<img src="${url}">`;
-            if (canSelect) c.onclick = () => { document.querySelectorAll('.card').forEach(x => x.classList.remove('selected')); c.classList.add('selected'); selectedImg = url; };
+            const c = document.createElement('div'); c.className = 'image-card'; c.innerHTML = `<img src="${url}">`;
+            if (canSelect) c.onclick = () => { document.querySelectorAll('.image-card').forEach(x => x.classList.remove('selected')); c.classList.add('selected'); selectedImg = url; };
             g.appendChild(c);
         });
     }
@@ -178,3 +320,4 @@
 </script>
 </body>
 </html>
+
