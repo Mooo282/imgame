@@ -7,7 +7,6 @@ const io = new Server(server);
 
 app.use(express.static('public'));
 
-// --- Image Pack Logic ---
 const imagePools = {
     "classic": ["/images/classic/1.jpg", "/images/classic/2.jpg", "/images/classic/3.jpg", "/images/classic/4.jpg", "/images/classic/5.jpg", "/images/classic/6.jpg"],
     "fun": ["/images/fun/1.jpg", "/images/fun/2.jpg", "/images/fun/3.jpg", "/images/fun/4.jpg", "/images/fun/5.jpg", "/images/fun/6.jpg"]
@@ -53,21 +52,18 @@ io.on('connection', (socket) => {
         if (gameState !== "LOBBY") {
             socket.emit('roundStarted', { images: currentImages, drawerId: currentDrawerId, drawerName: playerNames[currentDrawerId], targetPoints });
             if (currentClue) socket.emit('showClue', { clue: currentClue, pImages: [], drawerName: playerNames[currentDrawerId] });
-            if (gameState === "VOTING") {
-                let opts = [correctImage, ...Object.values(fakeImages)];
-                socket.emit('startVoting', { options: [...new Set(opts)], drawerId: currentDrawerId });
-            }
         }
     });
 
     socket.on('sendChat', (msg) => {
         const uId = socketToUserId[socket.id];
-        if (msg) io.emit('newChat', { sender: playerNames[uId], text: msg });
+        if (msg && playerNames[uId]) io.emit('newChat', { sender: playerNames[uId], text: msg });
     });
 
     socket.on('requestStart', (data) => {
         if (socketToUserId[socket.id] === hostId && gameState === "LOBBY") {
             players.forEach(id => scores[id] = 0);
+            emitPlayerList();
             targetPoints = parseInt(data.targetPoints) || 30;
             roundTimeLimit = parseInt(data.roundTime) || 60;
             currentPool = imagePools[data.mode] || imagePools["classic"];
@@ -163,10 +159,10 @@ io.on('connection', (socket) => {
                 if (uId === hostId) hostId = players.length > 0 ? players[0] : null;
                 if (uId === currentDrawerId && gameState !== "LOBBY") startNewRound();
                 emitPlayerList();
+                delete socketToUserId[socket.id];
             }, 5000);
-            delete socketToUserId[socket.id];
         }
     });
 });
 
-server.listen(3000, () => console.log('PixDeception PRO Running on Port 3000'));
+server.listen(3000, () => console.log('PixDeception PRO Running on 3000'));
