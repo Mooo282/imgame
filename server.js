@@ -80,7 +80,7 @@ io.on('connection', (socket) => {
             if (pId !== currentDrawerId) {
                 const pImages = currentPool.filter(img => img !== correctImage).sort(() => 0.5 - Math.random()).slice(0, 6);
                 const pSid = Object.keys(socketToUserId).find(k => socketToUserId[k] === pId);
-                if (pSid) io.to(pSid).emit('showClue', { clue: currentClue, pImages });
+                if (pSid) io.to(pSid).emit('showClue', { clue: currentClue, pImages: pImages });
             }
         });
         startTimer(roundTimeLimit, () => proceedToVoting());
@@ -90,15 +90,20 @@ io.on('connection', (socket) => {
         const uId = socketToUserId[socket.id];
         if (uId !== currentDrawerId && !fakeImages[uId]) {
             fakeImages[uId] = img;
-            if (Object.keys(fakeImages).length >= (players.length - 1)) proceedToVoting();
+            if (Object.keys(fakeImages).length >= (players.length - 1)) {
+                if (gameTimer) clearInterval(gameTimer);
+                proceedToVoting();
+            }
         }
     });
 
     function proceedToVoting() {
-        if (gameTimer) clearInterval(gameTimer);
         gameState = "VOTING";
         let opts = [...new Set([correctImage, ...Object.values(fakeImages)])];
-        while(opts.length < 6) opts.push(currentPool.find(img => !opts.includes(img)));
+        while(opts.length < 6) {
+            let extra = currentPool.find(img => !opts.includes(img));
+            if(extra) opts.push(extra); else break;
+        }
         io.emit('startVoting', { options: opts.sort(() => 0.5 - Math.random()), drawerId: currentDrawerId });
         startTimer(roundTimeLimit, () => finalizeRound());
     }
@@ -107,19 +112,19 @@ io.on('connection', (socket) => {
         const uId = socketToUserId[socket.id];
         if (uId !== currentDrawerId && !votes[uId]) {
             votes[uId] = img;
-            if (Object.keys(votes).length >= (players.length - 1)) finalizeRound();
+            if (Object.keys(votes).length >= (players.length - 1)) {
+                if (gameTimer) clearInterval(gameTimer);
+                finalizeRound();
+            }
         }
     });
 
     function finalizeRound() {
-        if (gameTimer) clearInterval(gameTimer);
         gameState = "RESULTS";
-        
         let totalVoters = players.length - 1;
         let correctCount = 0;
         for (let vId in votes) if (votes[vId] === correctImage) correctCount++;
         
-        // احتساب النقاط
         if (correctCount > 0 && correctCount < totalVoters) {
             scores[currentDrawerId] += (correctCount * 2);
             for (let vId in votes) if (votes[vId] === correctImage) scores[vId] += 3;
@@ -135,22 +140,33 @@ io.on('connection', (socket) => {
         }
         for (let fId in fakeImages) fakers[fakeImages[fId]] = playerNames[fId];
 
-        // إرسال النقاط والنتائج معاً لضمان التحديث
         io.emit('roundFinished', { correctImage, scores, voteDetails, fakers, drawerName: playerNames[currentDrawerId] });
-        emitPlayerList();
+        emitPlayerList(); // تحديث فوري للنقاط
 
         setTimeout(() => {
             if (players.some(id => scores[id] >= targetPoints)) {
                 gameState = "LOBBY";
                 io.emit('gameOver', { leaderboard: players.map(id => ({ name: playerNames[id], score: scores[id] })).sort((a,b) => b.score - a.score) });
-            } else startNewRound();
+                emitPlayerList();
+            } else if (players.length > 0) startNewRound();
         }, 10000);
     }
 
     socket.on('sendChat', (msg) => {
         const uId = socketToUserId[socket.id];
-        if (msg) io.emit('newChat', { sender: playerNames[uId], text: msg });
+        if (msg && playerNames[uId]) io.emit('newChat', { sender: playerNames[uId], text: msg });
+    });
+
+    socket.on('disconnect', () => {
+        const uId = socketToUserId[socket.id];
+        if (uId) {
+            disconnectTimeouts[uId] = setTimeout(() => {
+                players = players.filter(id => id !== uId);
+                if (uId === hostId) hostId = players[0] || null;
+                emitPlayerList();
+            }, 5000);
+        }
     });
 });
 
-server.listen(3000, () => console.log('Server running on 3000'));
+server.listen(3000, () => console.log('PixDeception Server Running on 3000'));
