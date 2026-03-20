@@ -13,7 +13,7 @@ const imagePools = {
 };
 
 let players = [], scores = {}, playerNames = {}, hostId = null;
-let playerReady = {}, targetPoints = 30, roundTimeLimit = 60, currentMode = "classic";
+let playerReady = {}, targetPoints = 30, roundTimeLimit = 60;
 let currentDrawerId = null, currentPool = [], gameState = "LOBBY";
 let currentImages = [], currentClue = "", correctImage = "";
 let fakeImages = {}, votes = {}, socketToUserId = {}, drawerQueue = [];
@@ -21,13 +21,7 @@ let gameTimer = null;
 
 function emitPlayerList() {
     io.emit('updatePlayerList', { 
-        players, 
-        playerNames, 
-        hostId, 
-        scores, // التأكد من إرسال السكورز
-        gameState, 
-        currentDrawerId, 
-        playerReady 
+        players, playerNames, hostId, scores, gameState, currentDrawerId, playerReady 
     });
 }
 
@@ -48,6 +42,7 @@ io.on('connection', (socket) => {
         socketToUserId[socket.id] = uId;
         playerNames[uId] = data.name;
         if (scores[uId] === undefined) scores[uId] = 0;
+        if (playerReady[uId] === undefined) playerReady[uId] = false;
         if (!players.includes(uId)) players.push(uId);
         if (!hostId || !players.includes(hostId)) hostId = players[0];
         emitPlayerList();
@@ -55,17 +50,16 @@ io.on('connection', (socket) => {
 
     socket.on('toggleReady', () => {
         const uId = socketToUserId[socket.id];
-        playerReady[uId] = !playerReady[uId];
-        emitPlayerList();
+        if (uId) { playerReady[uId] = !playerReady[uId]; emitPlayerList(); }
     });
 
     socket.on('requestStart', (data) => {
-        if (socketToUserId[socket.id] === hostId) {
-            players.forEach(id => scores[id] = 0); // تصفير عند البداية فقط
-            targetPoints = parseInt(data.targetPoints);
-            roundTimeLimit = parseInt(data.roundTime);
-            currentMode = data.mode;
-            currentPool = imagePools[currentMode] || imagePools["classic"];
+        const uId = socketToUserId[socket.id];
+        if (uId === hostId && gameState === "LOBBY") {
+            players.forEach(id => scores[id] = 0);
+            targetPoints = parseInt(data.targetPoints) || 30;
+            roundTimeLimit = parseInt(data.roundTime) || 60;
+            currentPool = imagePools[data.mode] || imagePools["classic"];
             drawerQueue = [];
             startNewRound();
         }
@@ -81,7 +75,8 @@ io.on('connection', (socket) => {
     }
 
     socket.on('submitClue', (data) => {
-        if (socketToUserId[socket.id] !== currentDrawerId) return;
+        const uId = socketToUserId[socket.id];
+        if (uId !== currentDrawerId || !data.clue) return;
         gameState = "FAKING"; correctImage = data.image; currentClue = data.clue;
         players.forEach(pId => {
             if (pId !== currentDrawerId) {
@@ -105,7 +100,10 @@ io.on('connection', (socket) => {
         if (gameTimer) clearInterval(gameTimer);
         gameState = "VOTING";
         let opts = [...new Set([correctImage, ...Object.values(fakeImages)])];
-        while(opts.length < 6) opts.push(currentPool.find(img => !opts.includes(img)));
+        while(opts.length < 6) {
+            let extra = currentPool.find(img => !opts.includes(img));
+            if(extra) opts.push(extra); else break;
+        }
         io.emit('startVoting', { options: opts.sort(() => 0.5 - Math.random()), drawerId: currentDrawerId });
         startTimer(roundTimeLimit, () => finalizeRound());
     }
@@ -141,23 +139,31 @@ io.on('connection', (socket) => {
         for (let fId in fakeImages) fakers[fakeImages[fId]] = playerNames[fId];
 
         io.emit('roundFinished', { correctImage, scores, voteDetails, fakers, drawerName: playerNames[currentDrawerId] });
-        emitPlayerList(); // تحديث فوري للنقاط
+        emitPlayerList();
 
         setTimeout(() => {
             if (players.some(id => scores[id] >= targetPoints)) {
                 gameState = "LOBBY";
                 io.emit('gameOver', { leaderboard: players.map(id => ({ name: playerNames[id], score: scores[id] })).sort((a,b) => b.score - a.score) });
                 emitPlayerList();
-            } else startNewRound();
+            } else if (players.length > 0) startNewRound();
         }, 10000);
     }
 
     socket.on('sendChat', (msg) => {
         const uId = socketToUserId[socket.id];
-        if (msg) io.emit('newChat', { sender: playerNames[uId], text: msg });
+        if (msg && playerNames[uId]) io.emit('newChat', { sender: playerNames[uId], text: msg });
+    });
+
+    socket.on('disconnect', () => {
+        const uId = socketToUserId[socket.id];
+        if (uId) {
+            players = players.filter(id => id !== uId);
+            if (uId === hostId) hostId = players[0] || null;
+            emitPlayerList();
+        }
     });
 });
-
 
 const PORT = process.env.PORT || 3000;
 
