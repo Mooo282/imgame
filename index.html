@@ -41,12 +41,10 @@
             #sidebar { display: none; }
             .mobile-nav { display: flex; }
             .image-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-            .game-area { padding: 15px; border-radius: 20px; }
-            #controls { margin-bottom: 20px; }
         }
         .hidden { display: none !important; }
-        .reveal-header { position: absolute; top: 0; left: 0; right: 0; font-size: 10px; font-weight: 900; text-align: center; color: #000; padding: 4px; }
-        .reveal-footer { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.8); color: #fff; font-size: 9px; padding: 5px; text-align: center; }
+        .reveal-header { position: absolute; top: 0; left: 0; right: 0; font-size: 10px; font-weight: 900; text-align: center; color: #000; padding: 4px; z-index: 10; }
+        .reveal-footer { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.8); color: #fff; font-size: 9px; padding: 5px; text-align: center; z-index: 10; }
     </style>
 </head>
 <body>
@@ -79,7 +77,6 @@
                 <button onclick="startGame()" class="btn-glow">Start Match</button>
             </div>
             <p id="wait-msg" style="text-align:center;">Waiting for Host to start...</p>
-            <button onclick="socket.emit('toggleReady')" class="btn-glow mobile-only" style="margin-top:20px; background:var(--success)">Toggle Ready</button>
         </div>
 
         <div id="game-screen" class="hidden">
@@ -101,7 +98,6 @@
     <button class="nav-btn" onclick="socket.emit('toggleReady')">✅</button>
 </div>
 
-<!-- Modals -->
 <div id="chat-modal" class="modal"><div class="modal-content"><span onclick="toggleModal('chat-modal')" style="float:right; cursor:pointer;">✖</span><h3>Chat</h3><div id="chat-messages" style="height:200px; overflow-y:auto; background:rgba(0,0,0,0.2); padding:10px; margin-bottom:10px;"></div><div style="display:flex; gap:5px;"><input type="text" id="chat-in" class="modern-input"><button onclick="sendChat()" class="btn-glow" style="width:60px;">Go</button></div></div></div>
 <div id="players-modal" class="modal"><div class="modal-content"><span onclick="toggleModal('players-modal')" style="float:right; cursor:pointer;">✖</span><h3>Players</h3><div id="player-list-mobile"></div></div></div>
 <div id="leaderboard-overlay" class="modal"><div class="modal-content"><h2>Game Over 🏆</h2><div id="final-list"></div><button onclick="location.reload()" class="btn-glow">Play Again</button></div></div>
@@ -143,7 +139,7 @@
         d.players.forEach(id => {
             const ready = d.playerReady[id] ? "✅" : "⏳";
             const c = getPlayerColor(id);
-            const dr = (id === d.currentDrawerId) ? "is-drawer" : "";
+            const dr = (id === d.currentDrawerId && d.gameState !== "LOBBY") ? "is-drawer" : "";
             const h = `<div class="player-card ${dr}"><span style="color:${c}">${ready} ${d.playerNames[id]}</span><span class="score-badge" style="background:${c}">${d.scores[id]||0}</span></div>`;
             sL.innerHTML += h; mL.innerHTML += h;
         });
@@ -201,7 +197,6 @@
             };
             g.appendChild(c);
         });
-        g.scrollTop = 0; // إعادة السكروول للأعلى عند تغيير الصور
     }
 
     function sendAction(t) {
