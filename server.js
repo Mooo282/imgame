@@ -4,7 +4,6 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-
 app.use(express.static('public'));
 
 const imagePools = {
@@ -40,15 +39,12 @@ io.on('connection', (socket) => {
         const uId = data.userId;
         if (disconnectTimeouts[uId]) { clearTimeout(disconnectTimeouts[uId]); delete disconnectTimeouts[uId]; }
         if (uId === currentDrawerId && drawerGraceTimer) { clearTimeout(drawerGraceTimer); drawerGraceTimer = null; }
-
         socketToUserId[socket.id] = uId;
         playerNames[uId] = data.name;
         if (scores[uId] === undefined) scores[uId] = 0;
         if (!players.includes(uId)) players.push(uId);
         if (!hostId || !players.includes(hostId)) hostId = players[0];
-
         emitPlayerList();
-
         if (gameState !== "LOBBY") {
             socket.emit('roundStarted', { images: currentImages, drawerId: currentDrawerId, drawerName: playerNames[currentDrawerId], targetPoints });
             if (currentClue) socket.emit('showClue', { clue: currentClue, pImages: [], drawerName: playerNames[currentDrawerId] });
@@ -132,9 +128,8 @@ io.on('connection', (socket) => {
         gameState = "RESULTS"; calculateScores();
         let voteDetails = {}, fakers = {};
         for (let vId in votes) {
-            const img = votes[vId];
-            if (!voteDetails[img]) voteDetails[img] = [];
-            voteDetails[img].push(playerNames[vId]);
+            if (!voteDetails[votes[vId]]) voteDetails[votes[vId]] = [];
+            voteDetails[votes[vId]].push(playerNames[vId]);
         }
         for (let fId in fakeImages) fakers[fakeImages[fId]] = playerNames[fId];
         io.emit('roundFinished', { correctImage, scores, voteDetails, fakers, drawerName: playerNames[currentDrawerId] });
@@ -159,10 +154,9 @@ io.on('connection', (socket) => {
                 if (uId === hostId) hostId = players.length > 0 ? players[0] : null;
                 if (uId === currentDrawerId && gameState !== "LOBBY") startNewRound();
                 emitPlayerList();
-                delete socketToUserId[socket.id];
             }, 5000);
+            delete socketToUserId[socket.id];
         }
     });
 });
-
-server.listen(3000, () => console.log('PixDeception PRO Running on 3000'));
+server.listen(3000);
