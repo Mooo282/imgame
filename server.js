@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
 app.use(express.static('public'));
 
 const imagePools = {
@@ -12,7 +13,7 @@ const imagePools = {
 };
 
 let players = [], scores = {}, playerNames = {}, hostId = null;
-let targetPoints = 30, roundTimeLimit = 60, currentDrawerId = null;
+let targetPoints = 30, roundTimeLimit = 60, currentDrawerId = null, currentPool = [];
 let gameState = "LOBBY", currentImages = [], currentClue = "", correctImage = "";
 let fakeImages = {}, votes = {}, socketToUserId = {}, drawerQueue = [], drawerGraceTimer = null;
 let disconnectTimeouts = {};
@@ -39,14 +40,17 @@ io.on('connection', (socket) => {
         const uId = data.userId;
         if (disconnectTimeouts[uId]) { clearTimeout(disconnectTimeouts[uId]); delete disconnectTimeouts[uId]; }
         if (uId === currentDrawerId && drawerGraceTimer) { clearTimeout(drawerGraceTimer); drawerGraceTimer = null; }
+
         socketToUserId[socket.id] = uId;
         playerNames[uId] = data.name;
         if (scores[uId] === undefined) scores[uId] = 0;
         if (!players.includes(uId)) players.push(uId);
         if (!hostId || !players.includes(hostId)) hostId = players[0];
         emitPlayerList();
+
         if (gameState !== "LOBBY") {
             socket.emit('roundStarted', { images: currentImages, drawerId: currentDrawerId, drawerName: playerNames[currentDrawerId], targetPoints });
+            if (currentClue) socket.emit('showClue', { clue: currentClue, pImages: [], drawerName: playerNames[currentDrawerId] });
         }
     });
 
@@ -58,11 +62,11 @@ io.on('connection', (socket) => {
     socket.on('requestStart', (data) => {
         if (socketToUserId[socket.id] === hostId && gameState === "LOBBY") {
             players.forEach(id => scores[id] = 0);
-            emitPlayerList();
             targetPoints = parseInt(data.targetPoints) || 30;
             roundTimeLimit = parseInt(data.roundTime) || 60;
             currentPool = imagePools[data.mode] || imagePools["classic"];
             drawerQueue = [];
+            emitPlayerList();
             startNewRound();
         }
     });
@@ -99,7 +103,13 @@ io.on('connection', (socket) => {
     function proceedToVoting() {
         gameState = "VOTING";
         let opts = [correctImage, ...Object.values(fakeImages)];
-        io.emit('startVoting', { options: [...new Set(opts)].sort(() => 0.5 - Math.random()), drawerId: currentDrawerId });
+        opts = [...new Set(opts)];
+        // ميزة استكمال الـ 6 صور
+        if (opts.length < 6) {
+            const extra = currentPool.filter(img => !opts.includes(img)).sort(() => 0.5 - Math.random()).slice(0, 6 - opts.length);
+            opts = [...opts, ...extra];
+        }
+        io.emit('startVoting', { options: opts.sort(() => 0.5 - Math.random()), drawerId: currentDrawerId });
         startTimer(roundTimeLimit, () => finalizeRound());
     }
 
@@ -124,7 +134,9 @@ io.on('connection', (socket) => {
     }
 
     function finalizeRound() {
-        gameState = "RESULTS"; calculateScores();
+        gameState = "RESULTS";
+        calculateScores();
+        emitPlayerList(); // تحديث فوري للنقاط
         let voteDetails = {}, fakers = {};
         for (let vId in votes) {
             if (!voteDetails[votes[vId]]) voteDetails[votes[vId]] = [];
@@ -132,11 +144,17 @@ io.on('connection', (socket) => {
         }
         for (let fId in fakeImages) fakers[fakeImages[fId]] = playerNames[fId];
         io.emit('roundFinished', { correctImage, scores, voteDetails, fakers, drawerName: playerNames[currentDrawerId] });
-        emitPlayerList();
         setTimeout(() => {
             if (players.some(id => scores[id] >= targetPoints)) finishGame();
             else if (players.length > 0) startNewRound();
         }, 10000);
+    }
+
+    function finishGame() {
+        gameState = "LOBBY";
+        const lb = players.map(id => ({ name: playerNames[id], score: scores[id] })).sort((a,b) => b.score - a.score);
+        io.emit('gameOver', { leaderboard: lb });
+        emitPlayerList();
     }
 
     socket.on('disconnect', () => {
@@ -152,4 +170,5 @@ io.on('connection', (socket) => {
         }
     });
 });
-server.listen(3000, () => console.log('PixDeception PRO Running...'));
+
+server.listen(3000, () => console.log('PixDeception PRO Running on 3000'));
