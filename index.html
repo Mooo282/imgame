@@ -2,7 +2,7 @@
 <html lang="en" dir="ltr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PixDeception Pro</title>
     <link href="https://fonts.googleapis.com" rel="stylesheet">
     <script src="/socket.io/socket.io.js"></script>
@@ -15,11 +15,11 @@
         /* Sidebar Desktop */
         #sidebar { width: 300px; background: rgba(0,0,0,0.5); backdrop-filter: blur(30px); border-right: 1px solid var(--glass-border); padding: 20px; display: flex; flex-direction: column; z-index: 100; }
         #player-list { flex: 1; overflow-y: auto; }
-        .player-card { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border: 2px solid transparent; font-size: 0.85em; }
+        .player-card { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border: 2px solid transparent; }
         .player-card.is-drawer { border-color: var(--primary); box-shadow: 0 0 10px var(--primary); }
         .score-badge { border-radius: 20px; padding: 2px 8px; font-weight: 900; color: #000; font-size: 0.8em; }
 
-        /* Chat */
+        /* Chat System */
         #chat-box { height: 300px; display: flex; flex-direction: column; border-top: 1px solid var(--glass-border); padding-top: 10px; }
         #chat-messages { flex: 1; overflow-y: auto; font-size: 0.8em; display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
         .chat-bubble { background: rgba(255,255,255,0.06); padding: 6px 10px; border-radius: 10px; }
@@ -36,30 +36,43 @@
         .image-card.selected { border-color: var(--primary); transform: scale(0.96); }
         .image-card.correct { border-color: var(--success); }
 
-        .reveal-header { position: absolute; top: 0; left: 0; right: 0; font-size: 9px; font-weight: 900; text-align: center; color: #000; padding: 3px; }
-        .reveal-footer { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.8); color: #fff; font-size: 8px; padding: 4px; text-align: center; }
-
         .btn-glow { width: 100%; padding: 12px; border-radius: 12px; border: none; background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; font-weight: 800; cursor: pointer; text-transform: uppercase; font-size: 0.75em; }
         .modern-input { width: 100%; padding: 10px; border-radius: 10px; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.2); color: white; margin-bottom: 10px; outline: none; }
         #timer { font-family: 'Space Grotesk'; font-size: 2.5em; font-weight: 900; color: var(--secondary); text-align: center; }
 
-        /* Mobile Optimization Fix */
+        /* Mobile Layout Transformation (FIXED) */
         @media (max-width: 900px) {
-            body { flex-direction: column; overflow-y: auto; height: auto; }
+            body { flex-direction: column; overflow: hidden; height: 100vh; }
+            
+            /* Top Player Bar */
             #sidebar { 
-                width: 100%; height: 160px; /* تقليص الارتفاع جداً */
-                flex-direction: row; padding: 8px; gap: 10px;
-                border-right: none; border-bottom: 1px solid var(--glass-border);
+                width: 100%; height: 60px; border-right: none; border-bottom: 1px solid var(--glass-border); 
+                flex-direction: row; padding: 5px 10px; background: rgba(0,0,0,0.6);
             }
-            #player-list { flex: 1; overflow-y: auto; border-right: 1px solid var(--glass-border); padding-right: 5px; }
-            #chat-box { flex: 1.5; margin-top: 0; padding-top: 0; border-top: none; }
-            #chat-messages { height: 80px; }
-            .chat-bubble { font-size: 0.7em; }
-            .image-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-            .btn-glow { padding: 10px; font-size: 0.7em; }
-            .modern-input { padding: 8px; font-size: 0.8em; }
-            .edit-name-wrap { position: absolute; top: 5px; right: 5px; scale: 0.7; } /* تصغير زر تغيير الاسم */
+            #player-list { 
+                display: flex; flex-direction: row; gap: 8px; overflow-x: auto; overflow-y: hidden; align-items: center; 
+            }
+            .player-card { margin-bottom: 0; min-width: 100px; padding: 5px 8px; font-size: 0.7em; white-space: nowrap; }
+            
+            /* Hidden Elements in Mobile Bar */
+            #chat-box { display: none; } /* إخفاء الشات ليفسح مساحة للصور */
+            .edit-name-wrap { position: absolute; right: 10px; top: 15px; z-index: 100; }
+            .edit-name-wrap button { width: 35px !important; height: 35px; border-radius: 50%; padding: 0 !important; }
+
+            /* Main Area Full Space */
+            #main-stage { padding: 10px; height: calc(100vh - 120px); }
+            .image-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .game-area { padding: 15px; border-radius: 20px; }
+            #timer { font-size: 2em; margin-bottom: 5px; }
+
+            /* Floating Chat Button for Mobile */
+            #mobile-chat-toggle {
+                display: block !important; position: fixed; bottom: 20px; right: 20px;
+                width: 50px; height: 50px; border-radius: 50%; background: var(--primary);
+                z-index: 5000; box-shadow: 0 5px 15px rgba(0,0,0,0.4); border: none; color: white;
+            }
         }
+        #mobile-chat-toggle { display: none; }
         #name-screen, #leaderboard-overlay { position: fixed; inset: 0; z-index: 3000; background: var(--bg); display: flex; justify-content: center; align-items: center; }
         .hidden { display: none !important; }
     </style>
@@ -68,23 +81,24 @@
 
 <div id="name-screen"><div class="login-card"><h1>PixDeception</h1><input type="text" id="nick" class="modern-input" placeholder="Nickname..."><button onclick="join()" class="btn-glow">Join</button></div></div>
 
+<!-- Mobile Sidebar (Top Player Bar in Mobile) -->
 <aside id="sidebar">
     <div id="player-list"></div>
     <div id="chat-box">
         <div id="chat-messages"></div>
         <div style="display:flex; gap:3px;"><input type="text" id="chat-in" class="modern-input" style="margin:0; font-size:10px;"><button onclick="sendChat()" class="btn-glow" style="width:40px; padding:0">OK</button></div>
     </div>
-    <div class="edit-name-wrap"><button onclick="logout()" class="btn-glow" style="background:rgba(255,255,255,0.1); width: auto; padding: 5px 10px;">⚙️</button></div>
+    <div class="edit-name-wrap"><button onclick="logout()" class="btn-glow" style="background:rgba(255,255,255,0.1);">⚙️</button></div>
 </aside>
 
 <main id="main-stage">
     <div class="game-area">
         <div id="lobby-screen" class="hidden">
             <div id="host-controls" class="hidden">
-                <h2 style="font-size:1.2em; margin-bottom:10px;">Settings ⚙️</h2>
+                <h2 style="font-size:1.1em; margin:0 0 10px;">Settings ⚙️</h2>
                 <select id="game-mode" class="modern-input"><option value="classic">Standard</option><option value="fun">Server Version 🚀</option></select>
-                <select id="win-points" class="modern-input"><option value="10">10 pts</option><option value="15">15 pts</option><option value="20">20 pts</option><option value="30" selected>30 pts</option><option value="45">45 pts</option><option value="60">60 pts</option><option value="90">90 pts</option></select>
-                <select id="round-timer" class="modern-input"><option value="30">30s</option><option value="45">45s</option><option value="60" selected>60s</option><option value="90">90s</option><option value="120">120s</option></select>
+                <select id="win-points" class="modern-input"><option value="10">10 pts</option><option value="20">20 pts</option><option value="30" selected>30 pts</option><option value="60">60 pts</option></select>
+                <select id="round-timer" class="modern-input"><option value="30">30s</option><option value="60" selected>60s</option><option value="90">90s</option></select>
                 <button onclick="startGame()" class="btn-glow">Launch</button>
             </div><p id="wait-msg">Waiting for Host...</p>
         </div>
@@ -100,6 +114,8 @@
     </div>
 </main>
 
+<button id="mobile-chat-toggle" onclick="toggleMobileChat()">💬</button>
+
 <div id="leaderboard-overlay" class="hidden"><div class="login-card"><h2>Final 🏆</h2><div id="final-list"></div><button onclick="location.reload()" class="btn-glow">Replay</button></div></div>
 
 <script>
@@ -108,6 +124,28 @@
 
     function getPlayerColor(str) { let hash = 0; for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash); return `hsl(${Math.abs(hash) % 360}, 70%, 75%)`; }
     function logout() { localStorage.removeItem('game_user_name'); location.reload(); }
+    
+    // وظيفة تبديل الشات في الهاتف
+    function toggleMobileChat() {
+        const chat = document.getElementById('chat-box');
+        if (window.innerWidth <= 900) {
+            if (chat.style.display === 'flex') {
+                chat.style.display = 'none';
+            } else {
+                chat.style.display = 'flex';
+                chat.style.position = 'fixed';
+                chat.style.bottom = '80px';
+                chat.style.right = '20px';
+                chat.style.width = '280px';
+                chat.style.height = '350px';
+                chat.style.background = 'rgba(0,0,0,0.9)';
+                chat.style.zIndex = '6000';
+                chat.style.borderRadius = '20px';
+                chat.style.padding = '15px';
+            }
+        }
+    }
+
     function join() { const n = document.getElementById('nick').value; if(!n) return; localStorage.setItem('game_user_name', n); socket.emit('joinGame', { userId: myId, name: n }); document.getElementById('name-screen').classList.add('hidden'); document.getElementById('lobby-screen').classList.remove('hidden'); }
     window.onload = () => { if(localStorage.getItem('game_user_name')) { document.getElementById('nick').value = localStorage.getItem('game_user_name'); join(); } };
     
@@ -119,7 +157,7 @@
         if (myId === d.hostId && d.gameState === "LOBBY") document.getElementById('host-controls').classList.remove('hidden');
         d.players.forEach(id => {
             const color = getPlayerColor(id); const isDrawer = (id === d.currentDrawerId) ? "is-drawer" : "";
-            list.innerHTML += `<div class="player-card ${isDrawer}"><span style="color:${color}; font-weight:bold;">${d.playerNames[id]}${id===d.hostId?' 👑':''}</span><span class="score-badge" style="background:${color}">${d.scores[id]||0}</span></div>`;
+            list.innerHTML += `<div class="player-card ${isDrawer}"><span style="color:${color}; font-weight:bold;">${d.playerNames[id]}${id===d.hostId?'👑':''}</span><span class="score-badge" style="background:${color}">${d.scores[id]||0}</span></div>`;
         });
     });
 
@@ -139,9 +177,9 @@
         document.getElementById('vote-ctrl').classList.add('hidden');
         document.querySelectorAll('.image-card').forEach(card => {
             const url = card.querySelector('img').getAttribute('src'); let html = "";
-            if(url === d.correctImage) { card.classList.add('correct'); html += `<div class="reveal-header" style="background:var(--success)">${d.drawerName} ✅</div>`; }
-            else if(d.fakers[url]) { card.style.borderColor = "var(--secondary)"; html += `<div class="reveal-header" style="background:var(--secondary); color:#fff">${d.fakers[url]} 😈</div>`; }
-            if(d.voteDetails[url]) html += `<div class="reveal-footer">${d.voteDetails[url].join(", ")}</div>`;
+            if(url === d.correctImage) { card.classList.add('correct'); html += `<div style="position:absolute;top:0;left:0;right:0;background:var(--success);color:#000;font-size:10px;text-align:center;padding:2px">${d.drawerName} ✅</div>`; }
+            else if(d.fakers[url]) { card.style.borderColor = "var(--secondary)"; html += `<div style="position:absolute;top:0;left:0;right:0;background:var(--secondary);color:#fff;font-size:10px;text-align:center;padding:2px">${d.fakers[url]} 😈</div>`; }
+            if(d.voteDetails[url]) html += `<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.8);color:#fff;font-size:9px;padding:4px;text-align:center;">${d.voteDetails[url].join(", ")}</div>`;
             card.insertAdjacentHTML('beforeend', html);
         });
     });
@@ -163,8 +201,8 @@
         else if (t === 'submitVote') { socket.emit('submitVote', selectedImg); document.getElementById('vote-ctrl').classList.add('hidden'); }
     }
 
-    socket.on('newChat', d => { const c = document.getElementById('chat-messages'); const m = document.createElement('div'); m.className = 'chat-bubble'; m.innerHTML = `<b style="font-size:0.8em;color:var(--primary)">${d.sender}: </b>${d.text}`; c.appendChild(m); c.scrollTop = c.scrollHeight; });
-    socket.on('gameOver', d => { document.getElementById('leaderboard-overlay').classList.remove('hidden'); const l = document.getElementById('final-list'); l.innerHTML = ""; d.leaderboard.forEach((p, i) => l.innerHTML += `<div style="display:flex;justify-content:space-between;padding:5px;background:rgba(255,255,255,0.05);border-radius:10px;margin-bottom:3px;"><span>${i+1}. ${p.name}</span><b>${p.score}</b></div>`); });
+    socket.on('newChat', d => { const c = document.getElementById('chat-messages'); const m = document.createElement('div'); m.className = 'chat-bubble'; m.innerHTML = `<b>${d.sender}: </b>${d.text}`; c.appendChild(m); c.scrollTop = c.scrollHeight; });
+    socket.on('gameOver', d => { document.getElementById('leaderboard-overlay').classList.remove('hidden'); const l = document.getElementById('final-list'); l.innerHTML = ""; d.leaderboard.forEach((p, i) => l.innerHTML += `<div style="display:flex;justify-content:space-between;padding:8px;background:rgba(255,255,255,0.05);border-radius:10px;margin-bottom:5px;"><span>${i+1}. ${p.name}</span><b>${p.score}</b></div>`); });
 </script>
 </body>
 </html>

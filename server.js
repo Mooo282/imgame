@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
 app.use(express.static('public'));
 
 const imagePools = {
@@ -47,7 +48,6 @@ io.on('connection', (socket) => {
         emitPlayerList();
         if (gameState !== "LOBBY") {
             socket.emit('roundStarted', { images: currentImages, drawerId: currentDrawerId, drawerName: playerNames[currentDrawerId], targetPoints });
-            if (currentClue) socket.emit('showClue', { clue: currentClue, pImages: [], drawerName: playerNames[currentDrawerId] });
         }
     });
 
@@ -140,12 +140,6 @@ io.on('connection', (socket) => {
         }, 10000);
     }
 
-    function finishGame() {
-        gameState = "LOBBY";
-        const lb = players.map(id => ({ name: playerNames[id], score: scores[id] })).sort((a,b) => b.score - a.score);
-        io.emit('gameOver', { leaderboard: lb });
-    }
-
     socket.on('disconnect', () => {
         const uId = socketToUserId[socket.id];
         if (uId) {
@@ -159,4 +153,5 @@ io.on('connection', (socket) => {
         }
     });
 });
-server.listen(3000);
+
+server.listen(3000, () => console.log('PixDeception Running on 3000'));
