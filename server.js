@@ -7,9 +7,10 @@ const io = new Server(server);
 
 app.use(express.static('public'));
 
+// تأكد من وجود عدد كافٍ من الصور في هذه المسارات (أكثر من 7 صور مفضل)
 const imagePools = {
-    "classic": ["/images/classic/1.jpg", "/images/classic/2.jpg", "/images/classic/3.jpg", "/images/classic/4.jpg", "/images/classic/5.jpg", "/images/classic/6.jpg"],
-    "fun": ["/images/fun/1.jpg", "/images/fun/2.jpg", "/images/fun/3.jpg", "/images/fun/4.jpg", "/images/fun/5.jpg", "/images/fun/6.jpg"]
+    "classic": ["/images/classic/1.jpg", "/images/classic/2.jpg", "/images/classic/3.jpg", "/images/classic/4.jpg", "/images/classic/5.jpg", "/images/classic/6.jpg", "/images/classic/7.jpg", "/images/classic/8.jpg"],
+    "fun": ["/images/fun/1.jpg", "/images/fun/2.jpg", "/images/fun/3.jpg", "/images/fun/4.jpg", "/images/fun/5.jpg", "/images/fun/6.jpg", "/images/fun/7.jpg", "/images/fun/8.jpg"]
 };
 
 let players = [], scores = {}, playerNames = {}, hostId = null;
@@ -63,7 +64,7 @@ io.on('connection', (socket) => {
 
     socket.on('requestStart', (data) => {
         if (socketToUserId[socket.id] === hostId && gameState === "LOBBY") {
-            players.forEach(id => scores[id] = 0);
+            players.forEach(id => scores[id] = 0); // تصفير النقاط عند بداية اللعبة فقط
             targetPoints = parseInt(data.targetPoints) || 30;
             roundTimeLimit = parseInt(data.roundTime) || 60;
             currentPool = imagePools[data.mode] || imagePools["classic"];
@@ -84,11 +85,15 @@ io.on('connection', (socket) => {
     socket.on('submitClue', (data) => {
         if (socketToUserId[socket.id] !== currentDrawerId || !data.clue) return;
         gameState = "FAKING"; correctImage = data.image; currentClue = data.clue;
+        
         players.forEach(pId => {
             if (pId !== currentDrawerId) {
-                const pImages = currentPool.filter(img => img !== correctImage).sort(() => 0.5 - Math.random()).slice(0, 6);
+                // تعديل: اختيار 6 صور عشوائية لا تتضمن الصورة الصحيحة
+                const availablePool = currentPool.filter(img => img !== correctImage);
+                const pImages = availablePool.sort(() => 0.5 - Math.random()).slice(0, 6);
+                
                 const pSid = Object.keys(socketToUserId).find(k => socketToUserId[k] === pId);
-                if (pSid) io.to(pSid).emit('showClue', { clue: currentClue, pImages });
+                if (pSid) io.to(pSid).emit('showClue', { clue: currentClue, pImages: pImages });
             }
         });
         startTimer(roundTimeLimit, () => proceedToVoting());
@@ -128,10 +133,11 @@ io.on('connection', (socket) => {
 
     function finalizeRound() {
         gameState = "RESULTS";
-        // احتساب النقاط فوراً
+        // احتساب النقاط
         let totalVoters = players.length - 1;
         let correctCount = 0;
         for (let vId in votes) if (votes[vId] === correctImage) correctCount++;
+        
         if (correctCount > 0 && correctCount < totalVoters) {
             scores[currentDrawerId] += (correctCount * 2);
             for (let vId in votes) if (votes[vId] === correctImage) scores[vId] += 3;
@@ -139,6 +145,9 @@ io.on('connection', (socket) => {
         for (let vId in votes) {
             for (let fId in fakeImages) if (votes[vId] === fakeImages[fId] && fId !== vId) scores[fId] += 1;
         }
+
+        // تحديث القائمة فوراً لإظهار النقاط الجديدة
+        emitPlayerList();
 
         let voteDetails = {}, fakers = {};
         for (let vId in votes) {
@@ -148,7 +157,6 @@ io.on('connection', (socket) => {
         for (let fId in fakeImages) fakers[fakeImages[fId]] = playerNames[fId];
 
         io.emit('roundFinished', { correctImage, scores, voteDetails, fakers, drawerName: playerNames[currentDrawerId] });
-        emitPlayerList();
 
         setTimeout(() => {
             if (players.some(id => scores[id] >= targetPoints)) finishGame();
@@ -183,4 +191,4 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(3000, () => console.log('Server running on port 3000'));
+server.listen(3000, () => console.log('PixDeception Server Running on 3000'));
