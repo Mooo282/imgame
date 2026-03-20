@@ -4,7 +4,6 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-
 app.use(express.static('public'));
 
 const imagePools = {
@@ -153,5 +152,4 @@ io.on('connection', (socket) => {
         }
     });
 });
-
-server.listen(3000, () => console.log('PixDeception Running on 3000'));
+server.listen(3000, () => console.log('PixDeception PRO Running...'));
