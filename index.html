@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PixDeception | Server Version</title>
+    <title>PixDeception | Official Rooms</title>
     <link href="https://fonts.googleapis.com" rel="stylesheet">
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        /* إعادة كافة المتغيرات والتنسيقات الأصلية التي وضعتها أنت */
         :root { --bg: #0f0c29; --card-bg: rgba(255, 255, 255, 0.07); --primary: #a78bfa; --secondary: #f472b6; --glass: rgba(255, 255, 255, 0.15); --success: #34d399; }
         * { box-sizing: border-box; transition: transform 0.3s, opacity 0.3s; }
         
@@ -45,57 +44,44 @@
         .game-area { background: var(--card-bg); backdrop-filter: blur(25px); border: 1px solid var(--glass); border-radius: 35px; padding: 25px; max-width: 900px; margin: 0 auto; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); }
 
         .image-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px auto; }
-        
-        .image-card { 
-            aspect-ratio: 1; border-radius: 25px; overflow: hidden; position: relative; border: 4px solid transparent; cursor: pointer;
-            opacity: 0; transform: translateY(20px); transition: 0.3s;
-        }
+        .image-card { aspect-ratio: 1; border-radius: 25px; overflow: hidden; position: relative; border: 4px solid transparent; cursor: pointer; opacity: 0; transform: translateY(20px); transition: 0.3s; }
         .image-card.reveal { opacity: 1; transform: translateY(0); }
         .image-card img { width: 100%; height: 100%; object-fit: cover; }
-
-        @keyframes pulse-border { 0% { box-shadow: 0 0 0 0 rgba(167, 139, 250, 0.5); } 70% { box-shadow: 0 0 0 15px rgba(167, 139, 250, 0); } 100% { box-shadow: 0 0 0 0 rgba(167, 139, 250, 0); } }
         .image-card.selected { border-color: var(--primary); animation: pulse-border 1.5s infinite; transform: scale(0.96); }
         .image-card.correct { border-color: var(--success); }
 
-        .btn-glow { width: 100%; padding: 14px; border-radius: 15px; border: none; background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; font-weight: 800; cursor: pointer; text-transform: uppercase; font-size: 0.8em; }
+        .btn-glow { width: 100%; padding: 14px; border-radius: 15px; border: none; background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; font-weight: 800; cursor: pointer; text-transform: uppercase; font-size: 0.8em; margin-top: 5px; }
         .btn-glow:hover { filter: brightness(1.2); letter-spacing: 1px; box-shadow: 0 0 15px var(--primary); }
+        .modern-input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--glass); background: rgba(0,0,0,0.3); color: white; margin-bottom: 10px; outline: none; text-align: center; }
 
-        .modern-input { 
-            width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--glass); background: rgba(0,0,0,0.3); color: white; margin-bottom: 10px; outline: none; 
-            text-align: center;
-        }
-        
-        #timer { font-size: 3em; font-weight: 900; color: var(--secondary); text-align: center; transition: 0.3s; }
+        #timer { font-size: 3em; font-weight: 900; color: var(--secondary); text-align: center; }
         #timer.low-time { color: #ff4757; text-shadow: 0 0 15px rgba(255, 71, 87, 0.6); animation: blink 0.8s infinite; }
         @keyframes blink { 50% { opacity: 0.7; } }
 
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(15px); display: none; justify-content: center; align-items: center; z-index: 5000; }
         .modal-content { background: var(--bg); border: 1px solid var(--glass); padding: 25px; border-radius: 30px; width: 90%; max-width: 400px; max-height: 80vh; overflow-y: auto; }
         
-        .reveal-header { position: absolute; top: 0; left: 0; right: 0; font-size: 10px; font-weight: 900; text-align: center; color: #000; padding: 4px; z-index: 5; }
-        .reveal-footer { 
-            position: absolute; bottom: 0; left: 0; right: 0; 
-            background: linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.5), transparent); 
-            color: #fff; font-size: 11px; padding: 12px 5px 6px 5px; text-align: center; font-weight: 600; 
-        }
+        #mobile-room-info { display: none; text-align: center; padding: 10px; background: rgba(15, 12, 41, 0.6); font-weight: bold; color: var(--primary); border-bottom: 1px solid var(--glass); font-size: 0.9em; letter-spacing: 2px; }
 
         @media (max-width: 900px) {
-            #sidebar { display: none; }
-            .mobile-nav { display: flex; }
+            #sidebar { display: none !important; }
+            #mobile-room-info { display: none; } /* سيظهر عبر JS بعد الدخول */
+            .mobile-nav { display: none; } /* سيظهر عبر JS بعد الدخول */
             .image-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
             .game-area { padding: 15px; border-radius: 20px; }
         }
-        .hidden { display: none !important; }
-        .mobile-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(15, 12, 41, 0.9); padding: 15px; display: none; justify-content: space-around; z-index: 4000; border-top: 1px solid var(--glass); }
+        
+        .mobile-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(15, 12, 41, 0.95); padding: 15px; display: none; justify-content: space-around; z-index: 4000; border-top: 1px solid var(--glass); backdrop-filter: blur(10px); }
         .nav-btn { width: 55px; height: 55px; border-radius: 50%; background: var(--glass); border: 1px solid var(--glass); color: white; font-size: 20px; }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-<!-- شاشة اختيار الغرفة مع الحفاظ على الهوية البصرية -->
+<!-- شاشة البداية -->
 <div id="setup-screen" style="position:fixed; inset:0; background:var(--bg); z-index:10000; display:flex; justify-content:center; align-items:center;">
-    <div class="game-area" style="width:300px; text-align:center;">
-        <h1 style="background:linear-gradient(to right, var(--primary), var(--secondary)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-size:2.5em;">PixDeception</h1>
+    <div class="game-area" style="width:320px; text-align:center;">
+        <h1 style="background:linear-gradient(to right, var(--primary), var(--secondary)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-size:2.5em; margin-bottom:20px;">PixDeception</h1>
         <input type="text" id="nick" class="modern-input" placeholder="Nickname..." autocomplete="off">
         <div id="room-actions">
             <button onclick="createRoom()" class="btn-glow">Create New Room</button>
@@ -114,6 +100,8 @@
         <button onclick="toggleModal('chat-modal')" class="btn-glow" style="background:rgba(255,255,255,0.05);">Chat 💬</button>
     </div>
 </aside>
+
+<div id="mobile-room-info" class="hidden">ROOM CODE: <span id="mobile-code-text">---</span></div>
 
 <main id="main-stage" class="hidden">
     <div class="game-area">
@@ -151,6 +139,7 @@
     <button class="nav-btn" onclick="socket.emit('toggleReady')">✅</button>
 </div>
 
+<!-- Modals -->
 <div id="chat-modal" class="modal"><div class="modal-content"><span onclick="toggleModal('chat-modal')" style="float:right; cursor:pointer;">✖</span><h3>Chat</h3><div id="chat-messages" style="height:200px; overflow-y:auto; background:rgba(0,0,0,0.2); padding:10px; margin-bottom:10px;"></div><div style="display:flex; gap:5px;"><input type="text" id="chat-in" class="modern-input" autocomplete="off"><button onclick="sendChat()" class="btn-glow" style="width:60px; margin-top:0;">Go</button></div></div></div>
 <div id="players-modal" class="modal"><div class="modal-content"><span onclick="toggleModal('players-modal')" style="float:right; cursor:pointer;">✖</span><h3>Players</h3><div id="player-list-mobile"></div></div></div>
 <div id="leaderboard-overlay" class="modal"><div class="modal-content"><h2>Game Over 🏆</h2><div id="final-list"></div><button onclick="location.reload()" class="btn-glow">Play Again</button></div></div>
@@ -179,13 +168,20 @@
         if(!n || !c) return alert("Enter name and code!");
         
         currentRoomCode = c;
-        localStorage.setItem('pix_name', n);
         socket.emit('joinGame', { userId: myId, name: n, roomCode: c });
         
         document.getElementById('setup-screen').classList.add('hidden');
         document.getElementById('sidebar').classList.remove('hidden');
         document.getElementById('main-stage').classList.remove('hidden');
+
+        // إظهار عناصر الهاتف فقط إذا كان العرض أصغر من 900px
+        if(window.innerWidth <= 900) {
+            document.getElementById('mobile-room-info').classList.remove('hidden');
+            document.querySelector('.mobile-nav').style.display = 'flex';
+        }
+
         document.getElementById('display-room-code').innerText = "CODE: " + c;
+        document.getElementById('mobile-code-text').innerText = c;
     }
 
     function startGame() { 
@@ -265,7 +261,7 @@
         const g = document.getElementById('grid'); g.innerHTML = "";
         images.forEach((url, index) => {
             const c = document.createElement('div'); c.className = 'image-card';
-            c.innerHTML = `<img src="${url}">`;
+            c.innerHTML = `<img src="${url}" onerror="this.src='https://placehold.co';">`;
             if (canSelect) c.onclick = () => { 
                 document.querySelectorAll('.image-card').forEach(x => x.classList.remove('selected'));
                 c.classList.add('selected'); selectedImg = url; 
