@@ -2,204 +2,181 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path'); 
-const fs = require('fs');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
 
-app.use('/images', express.static(path.join(__dirname, 'public/images')));
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
-function getImagesFromFolder(folderName) {
-    const dir = path.join(__dirname, 'public/images', folderName);
-    if (!fs.existsSync(dir)) return [];
-    return fs.readdirSync(dir).filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f)).map(f => `/images/${folderName}/${f}`);
-}
+app.use('/images', express.static(path.join(__dirname, 'public/images')));
+
+
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 const imagePools = {
-    get classic() { return getImagesFromFolder('classic'); },
-    get fun() { return getImagesFromFolder('fun'); }
+    "classic": Array.from({length: 50}, (_, i) => `/images/classic/${i+1}.jpg`),
+    "fun": Array.from({length: 50}, (_, i) => `/images/fun/${i+1}.jpg`)
 };
 
-let rooms = {}; 
-let roomDeleteTimeouts = {}; 
+let players = [], scores = {}, playerNames = {}, hostId = null;
+let playerReady = {}, targetPoints = 30, roundTimeLimit = 60;
+let currentDrawerId = null, currentPool = [], gameState = "LOBBY";
+let currentImages = [], currentClue = "", correctImage = "";
+let fakeImages = {}, votes = {}, socketToUserId = {}, drawerQueue = [];
+let disconnectTimeouts = {}, gameTimer = null;
 
-function emitPlayerList(rCode) {
-    const r = rooms[rCode];
-    if (r) io.to(rCode).emit('updatePlayerList', { players: r.players, playerNames: r.playerNames, hostId: r.hostId, scores: r.scores, gameState: r.gameState, currentDrawerId: r.currentDrawerId, playerReady: r.playerReady });
+function emitPlayerList() {
+    io.emit('updatePlayerList', { players, playerNames, hostId, scores, gameState, currentDrawerId, playerReady });
 }
 
-function startTimer(rCode, dur, onTimeout) {
-    const r = rooms[rCode];
-    if (!r) return;
-    if (r.gameTimer) clearInterval(r.gameTimer);
-    let left = dur;
-    io.to(rCode).emit('timerUpdate', left);
-    r.gameTimer = setInterval(() => {
-        left--;
-        io.to(rCode).emit('timerUpdate', left);
-        if (left <= 0) { clearInterval(r.gameTimer); if (onTimeout) onTimeout(); }
+function startTimer(duration, onTimeout) {
+    if (gameTimer) clearInterval(gameTimer);
+    let timeLeft = duration;
+    io.emit('timerUpdate', timeLeft);
+    gameTimer = setInterval(() => {
+        timeLeft--;
+        io.emit('timerUpdate', timeLeft);
+        if (timeLeft <= 0) { clearInterval(gameTimer); if (onTimeout) onTimeout(); }
     }, 1000);
 }
 
 io.on('connection', (socket) => {
-    socket.on('createRoom', (data) => {
-        const code = Math.random().toString(36).substring(2, 7).toUpperCase();
-        rooms[code] = { players: [], scores: {}, playerNames: {}, hostId: data.userId, playerReady: {}, targetPoints: 30, roundTimeLimit: 60, currentDrawerId: null, currentPool: [], gameState: "LOBBY", currentImages: [], currentClue: "", correctImage: "", fakeImages: {}, votes: {}, drawerQueue: [], gameTimer: null };
-        socket.emit('roomCreated', code);
-    });
-
     socket.on('joinGame', (data) => {
-        const { userId, name, roomCode } = data;
-        if (!roomCode || !rooms[roomCode]) return socket.emit('error', 'Room not found');
-        if (roomDeleteTimeouts[roomCode]) { clearTimeout(roomDeleteTimeouts[roomCode]); delete roomDeleteTimeouts[roomCode]; }
-        socket.join(roomCode); socket.roomCode = roomCode; socket.userId = userId;
-        const r = rooms[roomCode];
-        r.playerNames[userId] = name;
-        if (r.scores[userId] === undefined) r.scores[userId] = 0;
-        if (r.playerReady[userId] === undefined) r.playerReady[userId] = false;
-        if (!r.players.includes(userId)) r.players.push(userId);
-        if (!r.hostId || !r.players.includes(r.hostId)) r.hostId = r.players;
-        emitPlayerList(roomCode);
+        const uId = data.userId;
+        if (disconnectTimeouts[uId]) { clearTimeout(disconnectTimeouts[uId]); delete disconnectTimeouts[uId]; }
+        socketToUserId[socket.id] = uId;
+        playerNames[uId] = data.name;
+        if (scores[uId] === undefined) scores[uId] = 0;
+        if (playerReady[uId] === undefined) playerReady[uId] = false;
+        if (!players.includes(uId)) players.push(uId);
+        if (!hostId || !players.includes(hostId)) hostId = players[0];
+        emitPlayerList();
     });
 
     socket.on('toggleReady', () => {
-        const r = rooms[socket.roomCode];
-        if (r) { r.playerReady[socket.userId] = !r.playerReady[socket.userId]; emitPlayerList(socket.roomCode); }
+        const uId = socketToUserId[socket.id];
+        if (uId) { playerReady[uId] = !playerReady[uId]; emitPlayerList(); }
     });
 
     socket.on('requestStart', (data) => {
-        const r = rooms[socket.roomCode];
-        if (r && socket.userId === r.hostId && r.gameState === "LOBBY") {
-            r.players.forEach(id => r.scores[id] = 0);
-            r.targetPoints = parseInt(data.targetPoints); r.roundTimeLimit = parseInt(data.roundTime);
-            r.currentPool = imagePools[data.mode] || imagePools["classic"];
-            r.drawerQueue = []; startNewRound(socket.roomCode);
+        if (socketToUserId[socket.id] === hostId && gameState === "LOBBY") {
+            players.forEach(id => scores[id] = 0);
+            targetPoints = parseInt(data.targetPoints);
+            roundTimeLimit = parseInt(data.roundTime);
+            currentPool = imagePools[data.mode] || imagePools["classic"];
+            drawerQueue = [];
+            startNewRound();
         }
     });
 
-    function startNewRound(rCode) {
-        const r = rooms[rCode]; if (!r) return;
-        r.gameState = "DRAWING"; r.fakeImages = {}; r.votes = {}; r.currentClue = "";
-        if (r.drawerQueue.length === 0) r.drawerQueue = [...r.players].sort(() => 0.5 - Math.random());
-        r.currentDrawerId = r.drawerQueue.shift();
-        r.currentImages = [...r.currentPool].sort(() => 0.5 - Math.random()).slice(0, 6);
-        io.to(rCode).emit('roundStarted', { images: r.currentImages, drawerId: r.currentDrawerId, drawerName: r.playerNames[r.currentDrawerId] });
-        startTimer(rCode, r.roundTimeLimit, () => { if(r.gameState === "DRAWING") startNewRound(rCode); });
+    function startNewRound() {
+        gameState = "DRAWING"; fakeImages = {}; votes = {}; currentClue = "";
+        if (drawerQueue.length === 0) drawerQueue = [...players].sort(() => 0.5 - Math.random());
+        currentDrawerId = drawerQueue.shift();
+        currentImages = [...currentPool].sort(() => 0.5 - Math.random()).slice(0, 6);
+        io.emit('roundStarted', { images: currentImages, drawerId: currentDrawerId, drawerName: playerNames[currentDrawerId] });
+        startTimer(roundTimeLimit, () => { if(gameState === "DRAWING") startNewRound(); });
     }
 
     socket.on('submitClue', (data) => {
-        const r = rooms[socket.roomCode];
-        if (!r || socket.userId !== r.currentDrawerId || !data.clue) return;
-
-        r.gameState = "FAKING"; 
-        // تعديل الإصلاح هنا: استخراج الرابط النصي مباشرة
-        r.correctImage = (typeof data.image === 'object') ? data.image.image : data.image; 
-        r.currentClue = data.clue;
-        
-        r.players.forEach(pId => {
-            if (pId !== r.currentDrawerId) {
-                const pImgs = r.currentPool.filter(i => i !== r.correctImage).sort(() => 0.5 - Math.random()).slice(0, 6);
-                const targetSid = [...io.sockets.sockets.values()].find(s => s.userId === pId && s.roomCode === socket.roomCode)?.id;
-                if (targetSid) io.to(targetSid).emit('showClue', { clue: r.currentClue, pImages: pImgs });
+        if (socketToUserId[socket.id] !== currentDrawerId || !data.clue) return;
+        gameState = "FAKING"; correctImage = data.image; currentClue = data.clue;
+        players.forEach(pId => {
+            if (pId !== currentDrawerId) {
+                const pImages = currentPool.filter(img => img !== correctImage).sort(() => 0.5 - Math.random()).slice(0, 6);
+                const pSid = Object.keys(socketToUserId).find(k => socketToUserId[k] === pId);
+                if (pSid) io.to(pSid).emit('showClue', { clue: currentClue, pImages });
             }
         });
-        startTimer(socket.roomCode, r.roundTimeLimit, () => proceedToVoting(socket.roomCode));
+        startTimer(roundTimeLimit, () => proceedToVoting());
     });
 
     socket.on('submitFake', (img) => {
-        const r = rooms[socket.roomCode];
-        if (r && socket.userId !== r.currentDrawerId && !r.fakeImages[socket.userId] && r.gameState === "FAKING") {
-            r.fakeImages[socket.userId] = img;
-            if (Object.keys(r.fakeImages).length >= (r.players.length - 1)) proceedToVoting(socket.roomCode);
-        }
+        const uId = socketToUserId[socket.id];
+        if (uId === currentDrawerId || fakeImages[uId] || gameState !== "FAKING") return;
+        fakeImages[uId] = img;
+        if (Object.keys(fakeImages).length >= (players.length - 1)) proceedToVoting();
     });
 
-    function proceedToVoting(rCode) {
-        const r = rooms[rCode]; if (!r) return;
-        if (r.gameTimer) clearInterval(r.gameTimer);
-        r.gameState = "VOTING";
-        let opts = [...new Set([r.correctImage, ...Object.values(r.fakeImages)])];
-        if (opts.length < 6) opts = [...opts, ...r.currentPool.filter(i => !opts.includes(i)).sort(() => 0.5 - Math.random()).slice(0, 6 - opts.length)];
-        io.to(rCode).emit('startVoting', { options: opts.sort(() => 0.5 - Math.random()), drawerId: r.currentDrawerId });
-        startTimer(rCode, r.roundTimeLimit, () => finalizeRound(rCode));
+    function proceedToVoting() {
+        if (gameTimer) clearInterval(gameTimer);
+        gameState = "VOTING";
+        let opts = [...new Set([correctImage, ...Object.values(fakeImages)])];
+        if (opts.length < 6) {
+            const extra = currentPool.filter(img => !opts.includes(img)).sort(() => 0.5 - Math.random()).slice(0, 6 - opts.length);
+            opts = [...opts, ...extra];
+        }
+        io.emit('startVoting', { options: opts.sort(() => 0.5 - Math.random()), drawerId: currentDrawerId });
+        startTimer(roundTimeLimit, () => finalizeRound());
     }
 
     socket.on('submitVote', (img) => {
-        const r = rooms[socket.roomCode];
-        if (r && socket.userId !== r.currentDrawerId && !r.votes[socket.userId] && r.gameState === "VOTING") {
-            r.votes[socket.userId] = img;
-            if (Object.keys(r.votes).length >= (r.players.length - 1)) finalizeRound(socket.roomCode);
-        }
+        const uId = socketToUserId[socket.id];
+        if (uId === currentDrawerId || votes[uId] || gameState !== "VOTING") return;
+        votes[uId] = img;
+        if (Object.keys(votes).length >= (players.length - 1)) finalizeRound();
     });
 
-    function finalizeRound(rCode) {
-        const r = rooms[rCode]; if (!r) return;
-        if (r.gameTimer) clearInterval(r.gameTimer);
-        r.gameState = "RESULTS";
-        let total = r.players.length - 1, correctCount = 0;
-        for (let vId in r.votes) if (r.votes[vId] === r.correctImage) correctCount++;
+    function finalizeRound() {
+        if (gameTimer) clearInterval(gameTimer);
+        gameState = "RESULTS";
+        let totalVoters = players.length - 1, correctCount = 0;
+        for (let vId in votes) if (votes[vId] === correctImage) correctCount++;
         
-        // نظام احتساب النقاط
-        if (correctCount > 0 && correctCount < total) {
-            r.scores[r.currentDrawerId] += (correctCount * 2);
-            for (let vId in r.votes) if (r.votes[vId] === r.correctImage) r.scores[vId] += 2;
+        if (correctCount > 0 && correctCount < totalVoters) {
+            scores[currentDrawerId] += (correctCount * 2);
+            for (let vId in votes) if (votes[vId] === correctImage) scores[vId] += 2;
         }
-        for (let vId in r.votes) {
-            for (let fId in r.fakeImages) if (r.votes[vId] === r.fakeImages[fId] && fId !== vId) r.scores[fId] += 1;
+        for (let vId in votes) {
+            for (let fId in fakeImages) if (votes[vId] === fakeImages[fId] && fId !== vId) scores[fId] += 1;
         }
 
-        let details = {}, fakers = {};
-        for (let vId in r.votes) { 
-            if (!details[r.votes[vId]]) details[r.votes[vId]] = []; 
-            details[r.votes[vId]].push(r.playerNames[vId]); 
+        let voteDetails = {}, fakers = {};
+        for (let vId in votes) { 
+            if (!voteDetails[votes[vId]]) voteDetails[votes[vId]] = []; 
+            voteDetails[votes[vId]].push(playerNames[vId]); 
         }
-        for (let fId in r.fakeImages) fakers[r.fakeImages[fId]] = r.playerNames[fId];
+        for (let fId in fakeImages) fakers[fakeImages[fId]] = playerNames[fId];
 
-        io.to(rCode).emit('roundFinished', { correctImage: r.correctImage, scores: r.scores, voteDetails: details, fakers: fakers });
-        emitPlayerList(rCode);
+        io.emit('roundFinished', { correctImage, scores, voteDetails, fakers });
+        emitPlayerList();
 
-        setTimeout(() => { 
-            if (rooms[rCode] && rooms[rCode].players.some(id => rooms[rCode].scores[id] >= rooms[rCode].targetPoints)) finishGame(rCode);
-            else if (rooms[rCode] && rooms[rCode].players.length > 0) startNewRound(rCode);
+        setTimeout(() => {
+            if (players.some(id => scores[id] >= targetPoints)) finishGame();
+            else if (players.length > 0) startNewRound();
         }, 10000);
     }
 
-    function finishGame(rCode) {
-        const r = rooms[rCode]; if (!r) return;
-        r.gameState = "LOBBY";
-        const lb = r.players.map(id => ({ name: r.playerNames[id], score: r.scores[id] })).sort((a,b) => b.score - a.score);
-        io.to(rCode).emit('gameOver', { leaderboard: lb });
-        emitPlayerList(rCode);
+    function finishGame() {
+        gameState = "LOBBY";
+        const lb = players.map(id => ({ name: playerNames[id], score: scores[id] })).sort((a,b) => b.score - a.score);
+        io.emit('gameOver', { leaderboard: lb });
+        emitPlayerList();
     }
 
     socket.on('sendChat', (msg) => {
-        const r = rooms[socket.roomCode];
-        if (msg && r) io.to(socket.roomCode).emit('newChat', { sender: r.playerNames[socket.userId], text: msg });
+        const uId = socketToUserId[socket.id];
+        if (msg && playerNames[uId]) io.emit('newChat', { sender: playerNames[uId], text: msg });
     });
 
     socket.on('disconnect', () => {
-        const rCode = socket.roomCode;
-        const uId = socket.userId;
-        if (rCode && rooms[rCode]) {
-            const r = rooms[rCode];
-            r.players = r.players.filter(id => id !== uId);
-            if (r.players.length === 0) {
-                roomDeleteTimeouts[rCode] = setTimeout(() => {
-                    if (rooms[rCode] && rooms[rCode].players.length === 0) {
-                        if (rooms[rCode].gameTimer) clearInterval(rooms[rCode].gameTimer);
-                        delete rooms[rCode];
-                    }
-                }, 5000);
-            } else {
-                if (uId === r.hostId) r.hostId = r.players;
-                if (uId === r.currentDrawerId && r.gameState !== "LOBBY") startNewRound(rCode);
-                emitPlayerList(rCode);
-            }
+        const uId = socketToUserId[socket.id];
+        if (uId) {
+            disconnectTimeouts[uId] = setTimeout(() => {
+                players = players.filter(id => id !== uId);
+                delete playerReady[uId];
+                if (uId === hostId) hostId = players.length > 0 ? players[0] : null;
+                if (uId === currentDrawerId && gameState !== "LOBBY") startNewRound();
+                emitPlayerList();
+            }, 5000);
+            delete socketToUserId[socket.id];
         }
     });
 });
 
-server.listen(PORT, () => console.log(`Server Active on port ${PORT}`));
+server.listen(PORT, () => {
+    console.log(`PixDeception Running on port ${PORT}`);
+});
