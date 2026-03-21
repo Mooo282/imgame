@@ -11,17 +11,17 @@ const PORT = process.env.PORT || 3000;
 // إعداد مجلد الصور الثابتة
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
-// إرسال ملف الواجهة عند الدخول للموقع
-app.get('/', (req, res) => { 
-    res.sendFile(path.join(__dirname, 'index.html')); 
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// مصفوفات الصور
 const imagePools = {
     "classic": Array.from({length: 50}, (_, i) => `/images/classic/${i+1}.jpg`),
     "fun": Array.from({length: 50}, (_, i) => `/images/fun/${i+1}.jpg`)
 };
 
-// كائن إدارة الغرف ومؤقتات الحذف
+// إدارة الغرف ومؤقتات الحذف
 let rooms = {}; 
 let roomDeleteTimeouts = {}; 
 
@@ -58,7 +58,7 @@ function startTimer(roomCode, duration, onTimeout) {
 
 io.on('connection', (socket) => {
     
-    // إنشاء غرفة جديدة بكود فريد
+    // إنشاء غرفة جديدة
     socket.on('createRoom', (data) => {
         const roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
         rooms[roomCode] = {
@@ -71,12 +71,12 @@ io.on('connection', (socket) => {
         socket.emit('roomCreated', roomCode);
     });
 
-    // الانضمام لغرفة محددة
+    // الانضمام للعبة (Join Game)
     socket.on('joinGame', (data) => {
         const { userId, name, roomCode } = data;
-        if (!roomCode || !rooms[roomCode]) return socket.emit('error', 'Room not found');
+        if (!roomCode || !rooms[roomCode]) return socket.emit('error', 'Room not found!');
 
-        // إلغاء مؤقت الحذف (5 ثوانٍ) إذا عاد شخص للغرفة قبل حذفه
+        // إلغاء مؤقت الحذف إذا دخل شخص قبل انتهاء الـ 5 ثواني
         if (roomDeleteTimeouts[roomCode]) {
             clearTimeout(roomDeleteTimeouts[roomCode]);
             delete roomDeleteTimeouts[roomCode];
@@ -91,18 +91,16 @@ io.on('connection', (socket) => {
         if (room.scores[userId] === undefined) room.scores[userId] = 0;
         if (room.playerReady[userId] === undefined) room.playerReady[userId] = false;
         if (!room.players.includes(userId)) room.players.push(userId);
-        
-        // تعيين المضيف إذا لم يكن موجوداً
         if (!room.hostId || !room.players.includes(room.hostId)) room.hostId = room.players[0];
         
         emitPlayerList(roomCode);
     });
 
     socket.on('toggleReady', () => {
-        const rCode = socket.roomCode;
-        if (rCode && rooms[rCode]) {
-            rooms[rCode].playerReady[socket.userId] = !rooms[rCode].playerReady[socket.userId];
-            emitPlayerList(rCode);
+        const room = rooms[socket.roomCode];
+        if (room) {
+            room.playerReady[socket.userId] = !room.playerReady[socket.userId];
+            emitPlayerList(socket.roomCode);
         }
     });
 
@@ -132,7 +130,7 @@ io.on('connection', (socket) => {
             drawerName: room.playerNames[room.currentDrawerId] 
         });
         startTimer(rCode, room.roundTimeLimit, () => { 
-            if(room && room.gameState === "DRAWING") startNewRound(rCode); 
+            if(room.gameState === "DRAWING") startNewRound(rCode); 
         });
     }
 
@@ -144,8 +142,6 @@ io.on('connection', (socket) => {
         room.players.forEach(pId => {
             if (pId !== room.currentDrawerId) {
                 const pImages = room.currentPool.filter(img => img !== room.correctImage).sort(() => 0.5 - Math.random()).slice(0, 6);
-                
-                // البحث عن سوكيت اللاعب لإرسال الصور الخاصة به
                 const targetSid = [...io.sockets.sockets.values()].find(s => s.userId === pId && s.roomCode === socket.roomCode)?.id;
                 if (targetSid) io.to(targetSid).emit('showClue', { clue: room.currentClue, pImages });
             }
@@ -224,9 +220,9 @@ io.on('connection', (socket) => {
     }
 
     socket.on('sendChat', (msg) => {
-        const rCode = socket.roomCode;
-        if (msg && rCode && rooms[rCode]) {
-            io.to(rCode).emit('newChat', { sender: rooms[rCode].playerNames[socket.userId], text: msg });
+        const room = rooms[socket.roomCode];
+        if (msg && room) {
+            io.to(socket.roomCode).emit('newChat', { sender: room.playerNames[socket.userId], text: msg });
         }
     });
 
@@ -243,7 +239,6 @@ io.on('connection', (socket) => {
                     if (rooms[rCode] && rooms[rCode].players.length === 0) {
                         if (rooms[rCode].gameTimer) clearInterval(rooms[rCode].gameTimer);
                         delete rooms[rCode];
-                        console.log(`Room ${rCode} has been deleted due to inactivity.`);
                     }
                 }, 5000);
             } else {
@@ -255,4 +250,4 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server Active on port ${PORT}`));
