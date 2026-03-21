@@ -3,35 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PixDeception</title>
+    <title>PixDeception | Server Version</title>
+    <link href="https://fonts.googleapis.com" rel="stylesheet">
     <script src="/socket.io/socket.io.js"></script>
     <style>
         :root { --bg: #0f0c29; --card-bg: rgba(255, 255, 255, 0.08); --primary: #a78bfa; --secondary: #f472b6; --glass: rgba(255, 255, 255, 0.12); --success: #34d399; }
         * { box-sizing: border-box; transition: 0.3s; }
         body { font-family: 'Inter', sans-serif; margin: 0; height: 100vh; overflow: hidden; background: linear-gradient(125deg, #0f0c29, #302b63, #24243e); background-size: 400% 400%; animation: dreamGradient 15s ease infinite; display: flex; color: white; }
         @keyframes dreamGradient { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
         #sidebar { width: 300px; background: rgba(0,0,0,0.5); backdrop-filter: blur(30px); border-right: 1px solid var(--glass); padding: 25px; display: flex; flex-direction: column; z-index: 100; }
         #player-list-sidebar { flex: 1; overflow-y: auto; }
-        .player-card { background: rgba(255,255,255,0.05); padding: 12px; border-radius: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid transparent; }
+        .player-card { background: rgba(255,255,255,0.05); padding: 12px; border-radius: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid transparent; font-size: 0.85em; }
         .player-card.is-drawer { border-color: var(--primary); box-shadow: 0 0 10px var(--primary); }
         .score-badge { border-radius: 20px; padding: 2px 10px; font-weight: 900; color: #000; font-size: 0.8em; }
-        #main-stage { flex: 1; padding: 20px; overflow-y: auto; position: relative; padding-bottom: 120px; }
+
+        #main-stage { flex: 1; padding: 20px; overflow-y: auto; position: relative; -webkit-overflow-scrolling: touch; padding-bottom: 120px; }
         .game-area { background: var(--card-bg); backdrop-filter: blur(25px); border: 1px solid var(--glass); border-radius: 35px; padding: 25px; max-width: 900px; margin: 0 auto; }
+
         .image-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px auto; }
         .image-card { aspect-ratio: 1; border-radius: 25px; overflow: hidden; position: relative; border: 4px solid transparent; cursor: pointer; }
         .image-card img { width: 100%; height: 100%; object-fit: cover; }
         .image-card.selected { border-color: var(--primary); transform: scale(0.96); }
         .image-card.correct { border-color: var(--success); }
-        .btn-glow { width: 100%; padding: 14px; border-radius: 15px; border: none; background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; font-weight: 800; cursor: pointer; text-transform: uppercase; }
+
+        .btn-glow { width: 100%; padding: 14px; border-radius: 15px; border: none; background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; font-weight: 800; cursor: pointer; text-transform: uppercase; font-size: 0.8em; }
         .modern-input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--glass); background: rgba(0,0,0,0.2); color: white; margin-bottom: 10px; outline: none; }
         #timer { font-size: 3em; font-weight: 900; color: var(--secondary); text-align: center; }
+
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(15px); display: none; justify-content: center; align-items: center; z-index: 5000; }
-        .modal-content { background: var(--bg); border: 1px solid var(--glass); padding: 25px; border-radius: 30px; width: 90%; max-width: 400px; }
-        .mobile-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(15, 12, 41, 0.9); padding: 15px; display: none; justify-content: space-around; z-index: 4000; }
-        @media (max-width: 900px) { #sidebar { display: none; } .mobile-nav { display: flex; } .image-grid { grid-template-columns: repeat(2, 1fr); } }
+        .modal-content { background: var(--bg); border: 1px solid var(--glass); padding: 25px; border-radius: 30px; width: 90%; max-width: 400px; max-height: 80vh; overflow-y: auto; position: relative; }
+        
+        .mobile-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(15, 12, 41, 0.9); padding: 15px; display: none; justify-content: space-around; z-index: 4000; border-top: 1px solid var(--glass); }
+        .nav-btn { width: 55px; height: 55px; border-radius: 50%; background: var(--glass); border: 1px solid var(--glass); color: white; font-size: 20px; }
+
+        @media (max-width: 900px) {
+            #sidebar { display: none; }
+            .mobile-nav { display: flex; }
+            .image-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .game-area { padding: 15px; border-radius: 20px; }
+            #controls { margin-bottom: 20px; }
+        }
         .hidden { display: none !important; }
-        .reveal-header { position: absolute; top: 0; left: 0; right: 0; font-size: 11px; font-weight: 900; text-align: center; color: #000; padding: 4px; z-index: 10; }
-        .reveal-footer { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.8); color: #fff; font-size: 10px; padding: 5px; text-align: center; z-index: 10; }
+        .reveal-header { position: absolute; top: 0; left: 0; right: 0; font-size: 10px; font-weight: 900; text-align: center; color: #000; padding: 4px; }
+        .reveal-footer { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.8); color: #fff; font-size: 9px; padding: 5px; text-align: center; }
     </style>
 </head>
 <body>
@@ -64,6 +79,7 @@
                 <button onclick="startGame()" class="btn-glow">Start Match</button>
             </div>
             <p id="wait-msg" style="text-align:center;">Waiting for Host to start...</p>
+            <button onclick="socket.emit('toggleReady')" class="btn-glow mobile-only" style="margin-top:20px; background:var(--success)">Toggle Ready</button>
         </div>
 
         <div id="game-screen" class="hidden">
@@ -79,7 +95,15 @@
     </div>
 </main>
 
-<div id="chat-modal" class="modal"><div class="modal-content"><h3>Chat</h3><div id="chat-messages" style="height:200px; overflow-y:auto; background:rgba(0,0,0,0.2); padding:10px; margin-bottom:10px;"></div><div style="display:flex; gap:5px;"><input type="text" id="chat-in" class="modern-input"><button onclick="sendChat()" class="btn-glow" style="width:60px;">Go</button></div><button onclick="toggleModal('chat-modal')" class="btn-glow" style="margin-top:10px; background:gray;">Close</button></div></div>
+<div class="mobile-nav">
+    <button class="nav-btn" onclick="toggleModal('players-modal')">👤</button>
+    <button class="nav-btn" onclick="toggleModal('chat-modal')">💬</button>
+    <button class="nav-btn" onclick="socket.emit('toggleReady')">✅</button>
+</div>
+
+<!-- Modals -->
+<div id="chat-modal" class="modal"><div class="modal-content"><span onclick="toggleModal('chat-modal')" style="float:right; cursor:pointer;">✖</span><h3>Chat</h3><div id="chat-messages" style="height:200px; overflow-y:auto; background:rgba(0,0,0,0.2); padding:10px; margin-bottom:10px;"></div><div style="display:flex; gap:5px;"><input type="text" id="chat-in" class="modern-input"><button onclick="sendChat()" class="btn-glow" style="width:60px;">Go</button></div></div></div>
+<div id="players-modal" class="modal"><div class="modal-content"><span onclick="toggleModal('players-modal')" style="float:right; cursor:pointer;">✖</span><h3>Players</h3><div id="player-list-mobile"></div></div></div>
 <div id="leaderboard-overlay" class="modal"><div class="modal-content"><h2>Game Over 🏆</h2><div id="final-list"></div><button onclick="location.reload()" class="btn-glow">Play Again</button></div></div>
 
 <script>
@@ -110,17 +134,18 @@
         }); 
     }
 
-    // أهم وظيفة لتحديث الأسماء والنقاط فوراً
     socket.on('updatePlayerList', d => {
         const sL = document.getElementById('player-list-sidebar');
-        sL.innerHTML = "";
+        const mL = document.getElementById('player-list-mobile');
+        sL.innerHTML = mL.innerHTML = "";
         if (myId === d.hostId && d.gameState === "LOBBY") document.getElementById('host-controls').classList.remove('hidden');
         
         d.players.forEach(id => {
             const ready = d.playerReady[id] ? "✅" : "⏳";
             const c = getPlayerColor(id);
-            const dr = (id === d.currentDrawerId && d.gameState !== "LOBBY") ? "is-drawer" : "";
-            sL.innerHTML += `<div class="player-card ${dr}"><span style="color:${c}">${ready} ${d.playerNames[id]}</span><span class="score-badge" style="background:${c}">${d.scores[id]||0}</span></div>`;
+            const dr = (id === d.currentDrawerId) ? "is-drawer" : "";
+            const h = `<div class="player-card ${dr}"><span style="color:${c}">${ready} ${d.playerNames[id]}</span><span class="score-badge" style="background:${c}">${d.scores[id]||0}</span></div>`;
+            sL.innerHTML += h; mL.innerHTML += h;
         });
     });
 
@@ -137,7 +162,7 @@
         document.getElementById('clue-display').innerText = `CLUE: ${d.clue}`;
         if(myId !== d.drawerId) {
             document.getElementById('fake-ctrl').classList.remove('hidden');
-            if(d.pImages) render(d.pImages, true);
+            if(d.pImages && d.pImages.length > 0) render(d.pImages, true);
         }
     });
 
@@ -150,7 +175,6 @@
 
     socket.on('roundFinished', d => {
         document.getElementById('vote-ctrl').classList.add('hidden');
-        // ملاحظة: السيرفر يرسل تحديث القائمة updatePlayerList تلقائياً هنا
         document.querySelectorAll('.image-card').forEach(card => {
             const url = card.querySelector('img').getAttribute('src');
             let html = "";
@@ -177,6 +201,7 @@
             };
             g.appendChild(c);
         });
+        g.scrollTop = 0; // إعادة السكروول للأعلى عند تغيير الصور
     }
 
     function sendAction(t) {
