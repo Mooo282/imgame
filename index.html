@@ -33,9 +33,7 @@
         .player-card { 
             background: rgba(255,255,255,0.05); padding: 12px; border-radius: 15px; margin-bottom: 10px; 
             display: flex; justify-content: space-between; align-items: center; border: 1px solid transparent; font-size: 0.85em;
-            animation: slideInRight 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
         }
-        @keyframes slideInRight { from { transform: translateX(50px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
         .player-card.is-drawer { border-color: var(--primary); box-shadow: 0 0 10px var(--primary); background: linear-gradient(90deg, rgba(167, 139, 250, 0.1), transparent); }
         .score-badge { border-radius: 20px; padding: 2px 10px; font-weight: 900; color: #000; font-size: 0.8em; }
@@ -47,38 +45,50 @@
         .image-card { aspect-ratio: 1; border-radius: 25px; overflow: hidden; position: relative; border: 4px solid transparent; cursor: pointer; opacity: 0; transform: translateY(20px); transition: 0.3s; }
         .image-card.reveal { opacity: 1; transform: translateY(0); }
         .image-card img { width: 100%; height: 100%; object-fit: cover; }
-        .image-card.selected { border-color: var(--primary); animation: pulse-border 1.5s infinite; transform: scale(0.96); }
+        .image-card.selected { border-color: var(--primary); transform: scale(0.96); }
         .image-card.correct { border-color: var(--success); }
 
         .btn-glow { width: 100%; padding: 14px; border-radius: 15px; border: none; background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; font-weight: 800; cursor: pointer; text-transform: uppercase; font-size: 0.8em; margin-top: 5px; }
-        .btn-glow:hover { filter: brightness(1.2); letter-spacing: 1px; box-shadow: 0 0 15px var(--primary); }
         .modern-input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--glass); background: rgba(0,0,0,0.3); color: white; margin-bottom: 10px; outline: none; text-align: center; }
 
         #timer { font-size: 3em; font-weight: 900; color: var(--secondary); text-align: center; }
-        #timer.low-time { color: #ff4757; text-shadow: 0 0 15px rgba(255, 71, 87, 0.6); animation: blink 0.8s infinite; }
-        @keyframes blink { 50% { opacity: 0.7; } }
-
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(15px); display: none; justify-content: center; align-items: center; z-index: 5000; }
         .modal-content { background: var(--bg); border: 1px solid var(--glass); padding: 25px; border-radius: 30px; width: 90%; max-width: 400px; max-height: 80vh; overflow-y: auto; }
         
-        #mobile-room-info { display: none; text-align: center; padding: 10px; background: rgba(15, 12, 41, 0.6); font-weight: bold; color: var(--primary); border-bottom: 1px solid var(--glass); font-size: 0.9em; letter-spacing: 2px; }
+        /* شريط الكود للهاتف */
+        #mobile-room-info { 
+            display: none; 
+            text-align: center; 
+            padding: 12px; 
+            background: rgba(15, 12, 41, 0.9); 
+            font-weight: 900; 
+            color: var(--primary); 
+            border-bottom: 1px solid var(--glass); 
+            font-size: 1em; 
+            letter-spacing: 2px;
+            position: sticky;
+            top: 0;
+            z-index: 2000;
+        }
 
         @media (max-width: 900px) {
             #sidebar { display: none !important; }
-            #mobile-room-info { display: none; } /* سيظهر عبر JS بعد الدخول */
-            .mobile-nav { display: none; } /* سيظهر عبر JS بعد الدخول */
             .image-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
             .game-area { padding: 15px; border-radius: 20px; }
         }
         
-        .mobile-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(15, 12, 41, 0.95); padding: 15px; display: none; justify-content: space-around; z-index: 4000; border-top: 1px solid var(--glass); backdrop-filter: blur(10px); }
+        .mobile-nav { 
+            position: fixed; bottom: 0; left: 0; right: 0; 
+            background: rgba(15, 12, 41, 0.95); padding: 15px; 
+            display: none; justify-content: space-around; 
+            z-index: 4000; border-top: 1px solid var(--glass); 
+        }
         .nav-btn { width: 55px; height: 55px; border-radius: 50%; background: var(--glass); border: 1px solid var(--glass); color: white; font-size: 20px; }
         .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-<!-- شاشة البداية -->
 <div id="setup-screen" style="position:fixed; inset:0; background:var(--bg); z-index:10000; display:flex; justify-content:center; align-items:center;">
     <div class="game-area" style="width:320px; text-align:center;">
         <h1 style="background:linear-gradient(to right, var(--primary), var(--secondary)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-size:2.5em; margin-bottom:20px;">PixDeception</h1>
@@ -101,7 +111,8 @@
     </div>
 </aside>
 
-<div id="mobile-room-info" class="hidden">ROOM CODE: <span id="mobile-code-text">---</span></div>
+<!-- عنصر كود الغرفة المخصص للهاتف -->
+<div id="mobile-room-info">ROOM CODE: <span id="mobile-code-text">---</span></div>
 
 <main id="main-stage" class="hidden">
     <div class="game-area">
@@ -109,12 +120,8 @@
             <div id="host-controls" class="hidden">
                 <h2>Host Panel</h2>
                 <select id="game-mode" class="modern-input"><option value="classic">Standard</option><option value="fun">Server Version</option></select>
-                <select id="win-points" class="modern-input">
-                    <option value="15">15 pts</option><option value="30" selected>30 pts</option><option value="60">60 pts</option>
-                </select>
-                <select id="round-timer" class="modern-input">
-                    <option value="30">30s</option><option value="60" selected>60s</option><option value="90">90s</option>
-                </select>
+                <select id="win-points" class="modern-input"><option value="15">15 pts</option><option value="30" selected>30 pts</option><option value="60">60 pts</option></select>
+                <select id="round-timer" class="modern-input"><option value="30">30s</option><option value="60" selected>60s</option><option value="90">90s</option></select>
                 <button onclick="startGame()" class="btn-glow">Start Match</button>
             </div>
             <p id="wait-msg" style="text-align:center;">Waiting for Host to start...</p>
@@ -170,13 +177,16 @@
         currentRoomCode = c;
         socket.emit('joinGame', { userId: myId, name: n, roomCode: c });
         
-        document.getElementById('setup-screen').classList.add('hidden');
+        // إخفاء شاشة البداية
+        document.getElementById('setup-screen').style.display = 'none';
+        
+        // إظهار المحتوى الرئيسي
         document.getElementById('sidebar').classList.remove('hidden');
         document.getElementById('main-stage').classList.remove('hidden');
 
-        // إظهار عناصر الهاتف فقط إذا كان العرض أصغر من 900px
+        // التعامل مع الهاتف برمجياً
         if(window.innerWidth <= 900) {
-            document.getElementById('mobile-room-info').classList.remove('hidden');
+            document.getElementById('mobile-room-info').style.display = 'block';
             document.querySelector('.mobile-nav').style.display = 'flex';
         }
 
@@ -242,18 +252,8 @@
         document.getElementById('vote-ctrl').classList.add('hidden');
         document.querySelectorAll('.image-card').forEach(card => {
             const url = card.querySelector('img').getAttribute('src');
-            let html = "";
-            if(url === d.correctImage) {
-                card.classList.add('correct');
-                html += `<div class="reveal-header" style="background:var(--success); color:#000">CORRECT!</div>`;
-            } else if(d.fakers[url]) {
-                card.style.borderColor = "var(--secondary)";
-                html += `<div class="reveal-header" style="background:var(--secondary); color:#fff">${d.fakers[url]}</div>`;
-            }
-            if(d.voteDetails[url]) {
-                html += `<div class="reveal-footer">👤 ${d.voteDetails[url].join(", ")}</div>`;
-            }
-            card.insertAdjacentHTML('beforeend', html);
+            if(url === d.correctImage) card.style.borderColor = "var(--success)";
+            else if(d.fakers[url]) card.style.borderColor = "var(--secondary)";
         });
     });
 
@@ -299,8 +299,7 @@
 
     socket.on('gameOver', d => {
         toggleModal('leaderboard-overlay');
-        const l = document.getElementById('final-list'); l.innerHTML = "";
-        d.leaderboard.forEach(p => l.innerHTML += `<div style="display:flex;justify-content:space-between;padding:10px;"><span>${p.name}</span><b>${p.score}</b></div>`);
+        const l = document.getElementById('final-list'); l.innerHTML = d.leaderboard.map(p => `<div>${p.name}: ${p.score}</div>`).join('');
     });
 
     socket.on('error', msg => alert(msg));
