@@ -1,14 +1,21 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const path = require('path'); // مطلوب لإدارة المسارات
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// تحديد البورت ديناميكياً لـ Render أو استخدامه محلياً على 3000
 const PORT = process.env.PORT || 3000;
 
-app.use(express.static('public'));
+// إعداد المسارات بناءً على هيكلة ملفاتك
+// الوصول للمجلد الذي يحتوي على الصور
+app.use('/images', express.static(path.join(__dirname, 'public/images')));
+
+// تقديم ملف index.html من المجلد الرئيسي
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 const imagePools = {
     "classic": Array.from({length: 50}, (_, i) => `/images/classic/${i+1}.jpg`),
@@ -80,7 +87,6 @@ io.on('connection', (socket) => {
         gameState = "FAKING"; correctImage = data.image; currentClue = data.clue;
         players.forEach(pId => {
             if (pId !== currentDrawerId) {
-                // إرسال 6 صور مختلفة لكل لاعب مضلل (لا تشمل الصحيحة)
                 const pImages = currentPool.filter(img => img !== correctImage).sort(() => 0.5 - Math.random()).slice(0, 6);
                 const pSid = Object.keys(socketToUserId).find(k => socketToUserId[k] === pId);
                 if (pSid) io.to(pSid).emit('showClue', { clue: currentClue, pImages });
@@ -99,14 +105,11 @@ io.on('connection', (socket) => {
     function proceedToVoting() {
         if (gameTimer) clearInterval(gameTimer);
         gameState = "VOTING";
-        // تجميع الصور: الصحيحة + كل التضليل
         let opts = [...new Set([correctImage, ...Object.values(fakeImages)])];
-        // إذا كان العدد أقل من 6، نكمل النقص بصور عشوائية
         if (opts.length < 6) {
             const extra = currentPool.filter(img => !opts.includes(img)).sort(() => 0.5 - Math.random()).slice(0, 6 - opts.length);
             opts = [...opts, ...extra];
         }
-        // إذا كان أكثر من 6 (بسبب كثرة اللاعبين) يتم عرضها جميعاً تلقائياً
         io.emit('startVoting', { options: opts.sort(() => 0.5 - Math.random()), drawerId: currentDrawerId });
         startTimer(roundTimeLimit, () => finalizeRound());
     }
@@ -124,7 +127,6 @@ io.on('connection', (socket) => {
         let totalVoters = players.length - 1, correctCount = 0;
         for (let vId in votes) if (votes[vId] === correctImage) correctCount++;
         
-        // توزيع النقاط (المخمن الصحيح يأخذ 2 بدل 3)
         if (correctCount > 0 && correctCount < totalVoters) {
             scores[currentDrawerId] += (correctCount * 2);
             for (let vId in votes) if (votes[vId] === correctImage) scores[vId] += 2;
