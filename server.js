@@ -5,17 +5,13 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-    cors: { origin: "*" } // لضمان عمل السوكيت على السيرفرات السحابية
-});
+const io = new Server(server, { cors: { origin: "*" } });
 
 const PORT = process.env.PORT || 3000;
 
-// إعداد المجلدات الثابتة
 app.use(express.static(path.join(__dirname)));
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
-// إصلاح دالة الطلب الرئيسي (إضافة req)
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
@@ -31,6 +27,14 @@ let currentDrawerId = null, currentPool = [], gameState = "LOBBY";
 let currentImages = [], currentClue = "", correctImage = "";
 let fakeImages = {}, votes = {}, socketToUserId = {}, drawerQueue = [];
 let gameTimer = null;
+
+function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
 
 function emitPlayerList() {
     io.emit('updatePlayerList', { players, playerNames, hostId, scores, gameState, currentDrawerId, playerReady });
@@ -58,14 +62,12 @@ io.on('connection', (socket) => {
         if (!hostId || !players.includes(hostId)) hostId = players[0];
 
         if (gameState !== "LOBBY") {
-            if (gameState === "DRAWING") {
-                socket.emit('roundStarted', { images: currentImages, drawerId: currentDrawerId, drawerName: playerNames[currentDrawerId] });
-            } else if (gameState === "FAKING") {
-                const pImages = [...currentPool].filter(img => img !== correctImage).sort(() => 0.5 - Math.random()).slice(0, 6);
+            if (gameState === "DRAWING") socket.emit('roundStarted', { images: currentImages, drawerId: currentDrawerId, drawerName: playerNames[currentDrawerId] });
+            else if (gameState === "FAKING") {
+                const pImages = shuffle([...currentPool]).filter(img => img !== correctImage).slice(0, 6);
                 socket.emit('showClue', { clue: currentClue, pImages });
-            } else if (gameState === "VOTING") {
-                sendVotingOptions(socket.id);
             }
+            else if (gameState === "VOTING") sendVotingOptions(socket.id);
         }
         emitPlayerList();
     });
@@ -96,9 +98,9 @@ io.on('connection', (socket) => {
 
     function startNewRound() {
         gameState = "DRAWING"; fakeImages = {}; votes = {};
-        if (drawerQueue.length === 0) drawerQueue = [...players].sort(() => 0.5 - Math.random());
+        if (drawerQueue.length === 0) drawerQueue = shuffle([...players]);
         currentDrawerId = drawerQueue.shift();
-        currentImages = [...currentPool].sort(() => 0.5 - Math.random()).slice(0, 6);
+        currentImages = shuffle([...currentPool]).slice(0, 6);
         io.emit('roundStarted', { images: currentImages, drawerId: currentDrawerId, drawerName: playerNames[currentDrawerId] });
         startTimer(roundTimeLimit, () => { if(gameState === "DRAWING") startNewRound(); });
     }
@@ -108,7 +110,7 @@ io.on('connection', (socket) => {
         gameState = "FAKING"; correctImage = data.image; currentClue = data.clue;
         players.forEach(pId => {
             if (pId !== currentDrawerId) {
-                const pImages = [...currentPool].filter(img => img !== correctImage).sort(() => 0.5 - Math.random()).slice(0, 6);
+                const pImages = shuffle([...currentPool]).filter(img => img !== correctImage).slice(0, 6);
                 const sid = Object.keys(socketToUserId).find(k => socketToUserId[k] === pId);
                 if (sid) io.to(sid).emit('showClue', { clue: currentClue, pImages });
             }
@@ -129,12 +131,12 @@ io.on('connection', (socket) => {
     }
 
     function sendVotingOptions(targetId = null) {
-        let opts = [...new Set([correctImage, ...Object.values(fakeImages)])];
+        let opts = shuffle([...new Set([correctImage, ...Object.values(fakeImages)])]);
         while(opts.length < Math.min(6, currentPool.length)) {
             let rand = currentPool[Math.floor(Math.random()*currentPool.length)];
             if(!opts.includes(rand)) opts.push(rand);
         }
-        const data = { options: opts.sort(() => 0.5 - Math.random()), drawerId: currentDrawerId };
+        const data = { options: shuffle(opts), drawerId: currentDrawerId };
         if(targetId) io.to(targetId).emit('startVoting', data);
         else io.emit('startVoting', data);
     }
