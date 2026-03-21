@@ -7,9 +7,10 @@ const io = new Server(server);
 
 app.use(express.static('public'));
 
+// ملاحظة: تأكد من وجود 7 صور على الأقل في كل مجلد لتجنب نقص الصور في مرحلة التضليل
 const imagePools = {
-    "classic": ["/images/classic/1.jpg", "/images/classic/2.jpg", "/images/classic/3.jpg", "/images/classic/4.jpg", "/images/classic/5.jpg", "/images/classic/6.jpg", "/images/classic/7.jpg", "/images/classic/8.jpg"],
-    "fun": ["/images/fun/1.jpg", "/images/fun/2.jpg", "/images/fun/3.jpg", "/images/fun/4.jpg", "/images/fun/5.jpg", "/images/fun/6.jpg", "/images/fun/7.jpg", "/images/fun/8.jpg"]
+    "classic": ["/images/classic/1.jpg", "/images/classic/2.jpg", "/images/classic/3.jpg", "/images/classic/4.jpg", "/images/classic/5.jpg", "/images/classic/6.jpg", "/images/classic/7.jpg"],
+    "fun": ["/images/fun/1.jpg", "/images/fun/2.jpg", "/images/fun/3.jpg", "/images/fun/4.jpg", "/images/fun/5.jpg", "/images/fun/6.jpg", "/images/fun/7.jpg"]
 };
 
 let players = [], scores = {}, playerNames = {}, hostId = null;
@@ -79,7 +80,7 @@ io.on('connection', (socket) => {
         gameState = "FAKING"; correctImage = data.image; currentClue = data.clue;
         players.forEach(pId => {
             if (pId !== currentDrawerId) {
-                // إصلاح مشكلة صور التضليل: اختيار 6 صور بالضبط لا تشمل الصحيحة
+                // إصلاح: اختيار 6 صور بالضبط لا تشمل الصورة الصحيحة
                 const pImages = currentPool.filter(img => img !== correctImage).sort(() => 0.5 - Math.random()).slice(0, 6);
                 const pSid = Object.keys(socketToUserId).find(k => socketToUserId[k] === pId);
                 if (pSid) io.to(pSid).emit('showClue', { clue: currentClue, pImages });
@@ -116,6 +117,7 @@ io.on('connection', (socket) => {
         let correctCount = 0;
         for (let vId in votes) if (votes[vId] === correctImage) correctCount++;
         
+        // منطق النقاط
         if (correctCount > 0 && correctCount < totalVoters) {
             scores[currentDrawerId] += (correctCount * 2);
             for (let vId in votes) if (votes[vId] === correctImage) scores[vId] += 3;
@@ -124,7 +126,7 @@ io.on('connection', (socket) => {
             for (let fId in fakeImages) if (votes[vId] === fakeImages[fId] && fId !== vId) scores[fId] += 1;
         }
 
-        // تحديث النقاط فوراً للجميع
+        // إرسال التحديث فوراً للواجهة
         emitPlayerList();
 
         let voteDetails = {}, fakers = {};
