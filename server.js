@@ -8,12 +8,12 @@ const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
 
-
+// إعداد مجلد الصور الثابتة
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
-
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+// إرسال ملف الواجهة عند الدخول للموقع
+app.get('/', (req, res) => { 
+    res.sendFile(path.join(__dirname, 'index.html')); 
 });
 
 const imagePools = {
@@ -21,162 +21,238 @@ const imagePools = {
     "fun": Array.from({length: 50}, (_, i) => `/images/fun/${i+1}.jpg`)
 };
 
-let players = [], scores = {}, playerNames = {}, hostId = null;
-let playerReady = {}, targetPoints = 30, roundTimeLimit = 60;
-let currentDrawerId = null, currentPool = [], gameState = "LOBBY";
-let currentImages = [], currentClue = "", correctImage = "";
-let fakeImages = {}, votes = {}, socketToUserId = {}, drawerQueue = [];
-let disconnectTimeouts = {}, gameTimer = null;
+// كائن إدارة الغرف ومؤقتات الحذف
+let rooms = {}; 
+let roomDeleteTimeouts = {}; 
 
-function emitPlayerList() {
-    io.emit('updatePlayerList', { players, playerNames, hostId, scores, gameState, currentDrawerId, playerReady });
+function emitPlayerList(roomCode) {
+    const room = rooms[roomCode];
+    if (!room) return;
+    io.to(roomCode).emit('updatePlayerList', { 
+        players: room.players, 
+        playerNames: room.playerNames, 
+        hostId: room.hostId, 
+        scores: room.scores, 
+        gameState: room.gameState, 
+        currentDrawerId: room.currentDrawerId, 
+        playerReady: room.playerReady 
+    });
 }
 
-function startTimer(duration, onTimeout) {
-    if (gameTimer) clearInterval(gameTimer);
+function startTimer(roomCode, duration, onTimeout) {
+    const room = rooms[roomCode];
+    if (!room) return;
+    if (room.gameTimer) clearInterval(room.gameTimer);
+    
     let timeLeft = duration;
-    io.emit('timerUpdate', timeLeft);
-    gameTimer = setInterval(() => {
+    io.to(roomCode).emit('timerUpdate', timeLeft);
+    room.gameTimer = setInterval(() => {
         timeLeft--;
-        io.emit('timerUpdate', timeLeft);
-        if (timeLeft <= 0) { clearInterval(gameTimer); if (onTimeout) onTimeout(); }
+        io.to(roomCode).emit('timerUpdate', timeLeft);
+        if (timeLeft <= 0) { 
+            clearInterval(room.gameTimer); 
+            if (onTimeout) onTimeout(); 
+        }
     }, 1000);
 }
 
 io.on('connection', (socket) => {
+    
+    // إنشاء غرفة جديدة بكود فريد
+    socket.on('createRoom', (data) => {
+        const roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
+        rooms[roomCode] = {
+            players: [], scores: {}, playerNames: {}, hostId: data.userId,
+            playerReady: {}, targetPoints: 30, roundTimeLimit: 60,
+            currentDrawerId: null, currentPool: [], gameState: "LOBBY",
+            currentImages: [], currentClue: "", correctImage: "",
+            fakeImages: {}, votes: {}, drawerQueue: [], gameTimer: null
+        };
+        socket.emit('roomCreated', roomCode);
+    });
+
+    // الانضمام لغرفة محددة
     socket.on('joinGame', (data) => {
-        const uId = data.userId;
-        if (disconnectTimeouts[uId]) { clearTimeout(disconnectTimeouts[uId]); delete disconnectTimeouts[uId]; }
-        socketToUserId[socket.id] = uId;
-        playerNames[uId] = data.name;
-        if (scores[uId] === undefined) scores[uId] = 0;
-        if (playerReady[uId] === undefined) playerReady[uId] = false;
-        if (!players.includes(uId)) players.push(uId);
-        if (!hostId || !players.includes(hostId)) hostId = players[0];
-        emitPlayerList();
+        const { userId, name, roomCode } = data;
+        if (!roomCode || !rooms[roomCode]) return socket.emit('error', 'Room not found');
+
+        // إلغاء مؤقت الحذف (5 ثوانٍ) إذا عاد شخص للغرفة قبل حذفه
+        if (roomDeleteTimeouts[roomCode]) {
+            clearTimeout(roomDeleteTimeouts[roomCode]);
+            delete roomDeleteTimeouts[roomCode];
+        }
+
+        socket.join(roomCode);
+        socket.roomCode = roomCode;
+        socket.userId = userId;
+
+        const room = rooms[roomCode];
+        room.playerNames[userId] = name;
+        if (room.scores[userId] === undefined) room.scores[userId] = 0;
+        if (room.playerReady[userId] === undefined) room.playerReady[userId] = false;
+        if (!room.players.includes(userId)) room.players.push(userId);
+        
+        // تعيين المضيف إذا لم يكن موجوداً
+        if (!room.hostId || !room.players.includes(room.hostId)) room.hostId = room.players[0];
+        
+        emitPlayerList(roomCode);
     });
 
     socket.on('toggleReady', () => {
-        const uId = socketToUserId[socket.id];
-        if (uId) { playerReady[uId] = !playerReady[uId]; emitPlayerList(); }
+        const rCode = socket.roomCode;
+        if (rCode && rooms[rCode]) {
+            rooms[rCode].playerReady[socket.userId] = !rooms[rCode].playerReady[socket.userId];
+            emitPlayerList(rCode);
+        }
     });
 
     socket.on('requestStart', (data) => {
-        if (socketToUserId[socket.id] === hostId && gameState === "LOBBY") {
-            players.forEach(id => scores[id] = 0);
-            targetPoints = parseInt(data.targetPoints);
-            roundTimeLimit = parseInt(data.roundTime);
-            currentPool = imagePools[data.mode] || imagePools["classic"];
-            drawerQueue = [];
-            startNewRound();
+        const room = rooms[socket.roomCode];
+        if (room && socket.userId === room.hostId && room.gameState === "LOBBY") {
+            room.players.forEach(id => room.scores[id] = 0);
+            room.targetPoints = parseInt(data.targetPoints);
+            room.roundTimeLimit = parseInt(data.roundTime);
+            room.currentPool = imagePools[data.mode] || imagePools["classic"];
+            room.drawerQueue = [];
+            startNewRound(socket.roomCode);
         }
     });
 
-    function startNewRound() {
-        gameState = "DRAWING"; fakeImages = {}; votes = {}; currentClue = "";
-        if (drawerQueue.length === 0) drawerQueue = [...players].sort(() => 0.5 - Math.random());
-        currentDrawerId = drawerQueue.shift();
-        currentImages = [...currentPool].sort(() => 0.5 - Math.random()).slice(0, 6);
-        io.emit('roundStarted', { images: currentImages, drawerId: currentDrawerId, drawerName: playerNames[currentDrawerId] });
-        startTimer(roundTimeLimit, () => { if(gameState === "DRAWING") startNewRound(); });
+    function startNewRound(rCode) {
+        const room = rooms[rCode];
+        if (!room) return;
+        room.gameState = "DRAWING"; room.fakeImages = {}; room.votes = {}; room.currentClue = "";
+        if (room.drawerQueue.length === 0) room.drawerQueue = [...room.players].sort(() => 0.5 - Math.random());
+        room.currentDrawerId = room.drawerQueue.shift();
+        room.currentImages = [...room.currentPool].sort(() => 0.5 - Math.random()).slice(0, 6);
+        
+        io.to(rCode).emit('roundStarted', { 
+            images: room.currentImages, 
+            drawerId: room.currentDrawerId, 
+            drawerName: room.playerNames[room.currentDrawerId] 
+        });
+        startTimer(rCode, room.roundTimeLimit, () => { 
+            if(room && room.gameState === "DRAWING") startNewRound(rCode); 
+        });
     }
 
     socket.on('submitClue', (data) => {
-        if (socketToUserId[socket.id] !== currentDrawerId || !data.clue) return;
-        gameState = "FAKING"; correctImage = data.image; currentClue = data.clue;
-        players.forEach(pId => {
-            if (pId !== currentDrawerId) {
-                const pImages = currentPool.filter(img => img !== correctImage).sort(() => 0.5 - Math.random()).slice(0, 6);
-                const pSid = Object.keys(socketToUserId).find(k => socketToUserId[k] === pId);
-                if (pSid) io.to(pSid).emit('showClue', { clue: currentClue, pImages });
+        const room = rooms[socket.roomCode];
+        if (!room || socket.userId !== room.currentDrawerId || !data.clue) return;
+        room.gameState = "FAKING"; room.correctImage = data.image; room.currentClue = data.clue;
+        
+        room.players.forEach(pId => {
+            if (pId !== room.currentDrawerId) {
+                const pImages = room.currentPool.filter(img => img !== room.correctImage).sort(() => 0.5 - Math.random()).slice(0, 6);
+                
+                // البحث عن سوكيت اللاعب لإرسال الصور الخاصة به
+                const targetSid = [...io.sockets.sockets.values()].find(s => s.userId === pId && s.roomCode === socket.roomCode)?.id;
+                if (targetSid) io.to(targetSid).emit('showClue', { clue: room.currentClue, pImages });
             }
         });
-        startTimer(roundTimeLimit, () => proceedToVoting());
+        startTimer(socket.roomCode, room.roundTimeLimit, () => proceedToVoting(socket.roomCode));
     });
 
     socket.on('submitFake', (img) => {
-        const uId = socketToUserId[socket.id];
-        if (uId === currentDrawerId || fakeImages[uId] || gameState !== "FAKING") return;
-        fakeImages[uId] = img;
-        if (Object.keys(fakeImages).length >= (players.length - 1)) proceedToVoting();
+        const room = rooms[socket.roomCode];
+        if (!room || socket.userId === room.currentDrawerId || room.fakeImages[socket.userId] || room.gameState !== "FAKING") return;
+        room.fakeImages[socket.userId] = img;
+        if (Object.keys(room.fakeImages).length >= (room.players.length - 1)) proceedToVoting(socket.roomCode);
     });
 
-    function proceedToVoting() {
-        if (gameTimer) clearInterval(gameTimer);
-        gameState = "VOTING";
-        let opts = [...new Set([correctImage, ...Object.values(fakeImages)])];
+    function proceedToVoting(rCode) {
+        const room = rooms[rCode];
+        if (!room) return;
+        if (room.gameTimer) clearInterval(room.gameTimer);
+        room.gameState = "VOTING";
+        let opts = [...new Set([room.correctImage, ...Object.values(room.fakeImages)])];
         if (opts.length < 6) {
-            const extra = currentPool.filter(img => !opts.includes(img)).sort(() => 0.5 - Math.random()).slice(0, 6 - opts.length);
+            const extra = room.currentPool.filter(img => !opts.includes(img)).sort(() => 0.5 - Math.random()).slice(0, 6 - opts.length);
             opts = [...opts, ...extra];
         }
-        io.emit('startVoting', { options: opts.sort(() => 0.5 - Math.random()), drawerId: currentDrawerId });
-        startTimer(roundTimeLimit, () => finalizeRound());
+        io.to(rCode).emit('startVoting', { options: opts.sort(() => 0.5 - Math.random()), drawerId: room.currentDrawerId });
+        startTimer(rCode, room.roundTimeLimit, () => finalizeRound(rCode));
     }
 
     socket.on('submitVote', (img) => {
-        const uId = socketToUserId[socket.id];
-        if (uId === currentDrawerId || votes[uId] || gameState !== "VOTING") return;
-        votes[uId] = img;
-        if (Object.keys(votes).length >= (players.length - 1)) finalizeRound();
+        const room = rooms[socket.roomCode];
+        if (!room || socket.userId === room.currentDrawerId || room.votes[socket.userId] || room.gameState !== "VOTING") return;
+        room.votes[socket.userId] = img;
+        if (Object.keys(room.votes).length >= (room.players.length - 1)) finalizeRound(socket.roomCode);
     });
 
-    function finalizeRound() {
-        if (gameTimer) clearInterval(gameTimer);
-        gameState = "RESULTS";
-        let totalVoters = players.length - 1, correctCount = 0;
-        for (let vId in votes) if (votes[vId] === correctImage) correctCount++;
+    function finalizeRound(rCode) {
+        const room = rooms[rCode];
+        if (!room) return;
+        if (room.gameTimer) clearInterval(room.gameTimer);
+        room.gameState = "RESULTS";
+        
+        let totalVoters = room.players.length - 1, correctCount = 0;
+        for (let vId in room.votes) if (room.votes[vId] === room.correctImage) correctCount++;
         
         if (correctCount > 0 && correctCount < totalVoters) {
-            scores[currentDrawerId] += (correctCount * 2);
-            for (let vId in votes) if (votes[vId] === correctImage) scores[vId] += 2;
+            room.scores[room.currentDrawerId] += (correctCount * 2);
+            for (let vId in room.votes) if (room.votes[vId] === room.correctImage) room.scores[vId] += 2;
         }
-        for (let vId in votes) {
-            for (let fId in fakeImages) if (votes[vId] === fakeImages[fId] && fId !== vId) scores[fId] += 1;
+        for (let vId in room.votes) {
+            for (let fId in room.fakeImages) if (room.votes[vId] === room.fakeImages[fId] && fId !== vId) room.scores[fId] += 1;
         }
 
         let voteDetails = {}, fakers = {};
-        for (let vId in votes) { 
-            if (!voteDetails[votes[vId]]) voteDetails[votes[vId]] = []; 
-            voteDetails[votes[vId]].push(playerNames[vId]); 
+        for (let vId in room.votes) { 
+            if (!voteDetails[room.votes[vId]]) voteDetails[room.votes[vId]] = []; 
+            voteDetails[room.votes[vId]].push(room.playerNames[vId]); 
         }
-        for (let fId in fakeImages) fakers[fakeImages[fId]] = playerNames[fId];
+        for (let fId in room.fakeImages) fakers[room.fakeImages[fId]] = room.playerNames[fId];
 
-        io.emit('roundFinished', { correctImage, scores, voteDetails, fakers });
-        emitPlayerList();
+        io.to(rCode).emit('roundFinished', { correctImage: room.correctImage, scores: room.scores, voteDetails, fakers });
+        emitPlayerList(rCode);
 
         setTimeout(() => {
-            if (players.some(id => scores[id] >= targetPoints)) finishGame();
-            else if (players.length > 0) startNewRound();
+            if (room && room.players.some(id => room.scores[id] >= room.targetPoints)) finishGame(rCode);
+            else if (room && room.players.length > 0) startNewRound(rCode);
         }, 10000);
     }
 
-    function finishGame() {
-        gameState = "LOBBY";
-        const lb = players.map(id => ({ name: playerNames[id], score: scores[id] })).sort((a,b) => b.score - a.score);
-        io.emit('gameOver', { leaderboard: lb });
-        emitPlayerList();
+    function finishGame(rCode) {
+        const room = rooms[rCode];
+        if (!room) return;
+        room.gameState = "LOBBY";
+        const lb = room.players.map(id => ({ name: room.playerNames[id], score: room.scores[id] })).sort((a,b) => b.score - a.score);
+        io.to(rCode).emit('gameOver', { leaderboard: lb });
+        emitPlayerList(rCode);
     }
 
     socket.on('sendChat', (msg) => {
-        const uId = socketToUserId[socket.id];
-        if (msg && playerNames[uId]) io.emit('newChat', { sender: playerNames[uId], text: msg });
+        const rCode = socket.roomCode;
+        if (msg && rCode && rooms[rCode]) {
+            io.to(rCode).emit('newChat', { sender: rooms[rCode].playerNames[socket.userId], text: msg });
+        }
     });
 
     socket.on('disconnect', () => {
-        const uId = socketToUserId[socket.id];
-        if (uId) {
-            disconnectTimeouts[uId] = setTimeout(() => {
-                players = players.filter(id => id !== uId);
-                delete playerReady[uId];
-                if (uId === hostId) hostId = players.length > 0 ? players[0] : null;
-                if (uId === currentDrawerId && gameState !== "LOBBY") startNewRound();
-                emitPlayerList();
-            }, 5000);
-            delete socketToUserId[socket.id];
+        const rCode = socket.roomCode;
+        const uId = socket.userId;
+        if (rCode && rooms[rCode]) {
+            const room = rooms[rCode];
+            room.players = room.players.filter(id => id !== uId);
+            
+            if (room.players.length === 0) {
+                // حذف الغرفة بعد 5 ثوانٍ من خروج آخر لاعب
+                roomDeleteTimeouts[rCode] = setTimeout(() => {
+                    if (rooms[rCode] && rooms[rCode].players.length === 0) {
+                        if (rooms[rCode].gameTimer) clearInterval(rooms[rCode].gameTimer);
+                        delete rooms[rCode];
+                        console.log(`Room ${rCode} has been deleted due to inactivity.`);
+                    }
+                }, 5000);
+            } else {
+                if (uId === room.hostId) room.hostId = room.players[0];
+                if (uId === room.currentDrawerId && room.gameState !== "LOBBY") startNewRound(rCode);
+                emitPlayerList(rCode);
+            }
         }
     });
 });
 
-server.listen(PORT, () => {
-    console.log(`PixDeception Running on port ${PORT}`);
-});
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
