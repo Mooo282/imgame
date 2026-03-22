@@ -69,13 +69,10 @@ function startTimer(roomId, duration, onTimeout) {
 io.on('connection', (socket) => {
     socket.on('joinGame', (data) => {
         const { userId, name, roomId, action } = data;
-        
-        // منع الانضمام إذا كانت الغرفة غير موجودة والاختيار هو "انضمام" (أو ريفريش لغرفة منتهية)
-        if (!rooms[roomId] && action === 'join') return socket.emit('errorMsg', 'Room not found!');
+        if (action === 'join' && !rooms[roomId]) return socket.emit('errorMsg', 'Room not found!');
         
         socket.roomId = roomId; socket.userId = userId; socket.join(roomId);
         socketToUserId[socket.id] = userId;
-        
         const room = getRoom(roomId);
         room.playerNames[userId] = name;
         if (room.scores[userId] === undefined) room.scores[userId] = 0;
@@ -84,11 +81,11 @@ io.on('connection', (socket) => {
             room.players.push(userId);
             if (room.gameState !== "LOBBY") room.drawerQueue.push(userId);
         }
-        
         if (!room.hostId) room.hostId = userId;
+
         socket.emit('joinSuccess');
 
-        // منطق إعادة الاتصال (المزامنة الفورية عند الريفريش)
+        // منطق إعادة الاتصال (المزامنة)
         if (room.gameState !== "LOBBY") {
             socket.emit('forceGameView');
             if (room.gameState === "DRAWING") {
@@ -98,8 +95,13 @@ io.on('connection', (socket) => {
                 const pImgs = (userId !== room.currentDrawerId) ? shuffle(room.currentPool).filter(img => img !== room.correctImage).slice(0, 6) : [];
                 socket.emit('showClue', { clue: room.currentClue, pImages: pImgs, drawerId: room.currentDrawerId });
             } else if (room.gameState === "VOTING") {
+                // التأكد من إرسال 6 خيارات عند إعادة الاتصال
                 let opts = shuffle([...new Set([room.correctImage, ...Object.values(room.fakeImages)])]);
-                socket.emit('startVoting', { options: opts, drawerId: room.currentDrawerId });
+                while(opts.length < Math.min(6, room.currentPool.length)) {
+                    let rand = room.currentPool[Math.floor(Math.random()*room.currentPool.length)];
+                    if(!opts.includes(rand)) opts.push(rand);
+                }
+                socket.emit('startVoting', { options: shuffle(opts), drawerId: room.currentDrawerId });
             }
         }
         emitPlayerList(roomId);
