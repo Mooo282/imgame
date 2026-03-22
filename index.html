@@ -77,7 +77,6 @@
 
         .has-notification { position: relative; animation: pulse-red 1.5s infinite !important; border-color: #ff4757 !important; }
         .has-notification::after { content: ""; position: absolute; top: 5px; right: 5px; width: 10px; height: 10px; background: #ff4757; border-radius: 50%; border: 2px solid var(--bg); z-index: 10; }
-        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(255, 71, 87, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0); } }
 
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(15px); display: none; justify-content: center; align-items: center; z-index: 5000; }
         .modal-content { background: var(--bg); border: 1px solid var(--glass); padding: 25px; border-radius: 30px; width: 90%; max-width: 400px; }
@@ -107,7 +106,7 @@
             <button onclick="showEntryForm('join')" class="btn-glow" style="background: var(--glass); border: 1px solid var(--glass);">Join Room</button>
         </div>
         <div id="entry-form" class="hidden">
-            <input type="text" id="nick" class="modern-input" placeholder="Nickname..." autocomplete="off" spellcheck="false">
+            <input type="text" id="nick" class="modern-input" placeholder="Nickname..." autocomplete="off">
             <input type="text" id="room-id" class="modern-input" placeholder="Room ID..." autocomplete="off">
             <button id="submit-btn" onclick="processEntry()" class="btn-glow">Enter Game</button>
             <button onclick="showEntryForm('back')" style="background:none; border:none; color:var(--primary); cursor:pointer; margin-top:15px; font-size:0.8em;">← Go Back</button>
@@ -171,9 +170,8 @@
     let myId = localStorage.getItem('pix_uid') || 'u_'+Math.random().toString(36).substr(2,9);
     localStorage.setItem('pix_uid', myId);
     let selectedImg = null;
-    let entryMode = 'join';
 
-    // منع الوميض: إذا كان هناك بيانات مخزنة، لا تظهر شاشة الدخول أصلاً
+    // إخفاء الشاشة فوراً إذا كان هناك بيانات محفوظة لتقليل الوميض
     if (localStorage.getItem('pix_name') && localStorage.getItem('pix_room')) {
         document.getElementById('name-screen').style.display = 'none';
     }
@@ -182,42 +180,54 @@
         const savedName = localStorage.getItem('pix_name');
         const savedRoom = localStorage.getItem('pix_room');
         if (savedName && savedRoom) {
-            document.getElementById('nick').value = savedName;
-            document.getElementById('room-id').value = savedRoom;
             document.getElementById('current-room-id').innerText = savedRoom;
+            // محاولة انضمام صامتة
             socket.emit('joinGame', { userId: myId, name: savedName, roomId: savedRoom, action: 'join' });
         }
     };
+
+    socket.on('errorMsg', (m) => {
+        if (m === 'NF') {
+            // إذا كانت الغرفة غير موجودة، امسح البيانات واظهر شاشة الدخول بصمت
+            localStorage.removeItem('pix_room');
+            document.getElementById('name-screen').style.display = 'flex';
+            document.getElementById('name-screen').classList.remove('hidden');
+        } else {
+            alert(m);
+        }
+    });
 
     function copyRoomCode() { const code = document.getElementById('current-room-id').innerText; if (code !== "----") navigator.clipboard.writeText(code); }
 
     function showEntryForm(mode) {
         const options = document.getElementById('entry-options'), form = document.getElementById('entry-form'), rid = document.getElementById('room-id'), btn = document.getElementById('submit-btn');
         if (mode === 'back') { options.classList.remove('hidden'); form.classList.add('hidden'); return; }
-        entryMode = mode; options.classList.add('hidden'); form.classList.remove('hidden');
+        options.classList.add('hidden'); form.classList.remove('hidden');
         if (mode === 'create') { rid.value = Math.floor(10000 + Math.random() * 90000); rid.readOnly = true; btn.innerText = "Create & Enter"; }
         else { rid.value = ""; rid.readOnly = false; btn.innerText = "Join Room"; }
     }
 
     function processEntry() {
         const n = document.getElementById('nick').value, r = document.getElementById('room-id').value;
-        if(!n || !r) return alert("All fields are required!");
+        if(!n || !r) return alert("Required!");
         localStorage.setItem('pix_name', n); localStorage.setItem('pix_room', r);
         document.getElementById('current-room-id').innerText = r;
-        socket.emit('joinGame', { userId: myId, name: n, roomId: r, action: entryMode });
+        socket.emit('joinGame', { userId: myId, name: n, roomId: r, action: 'join' });
     }
 
-    function toggleModal(id) { 
-        const m = document.getElementById(id); 
-        m.style.display = (m.style.display !== 'flex') ? 'flex' : 'none'; 
+    function toggleModal(id) {
+        const m = document.getElementById(id);
+        m.style.display = (m.style.display !== 'flex') ? 'flex' : 'none';
         if (id === 'chat-modal' && m.style.display === 'flex') {
             document.getElementById('chat-btn-sidebar').classList.remove('has-notification');
             document.getElementById('chat-btn-mobile').classList.remove('has-notification');
         }
     }
 
-    socket.on('joinSuccess', () => { document.getElementById('name-screen').classList.add('hidden'); document.getElementById('lobby-screen').classList.remove('hidden'); });
-    socket.on('errorMsg', (msg) => { localStorage.removeItem('pix_room'); alert(msg); location.reload(); });
+    socket.on('joinSuccess', () => { 
+        document.getElementById('name-screen').style.display = 'none';
+        document.getElementById('lobby-screen').classList.remove('hidden'); 
+    });
 
     function startGame() { socket.emit('requestStart', { targetPoints: document.getElementById('win-points').value, roundTime: document.getElementById('round-timer').value, mode: document.getElementById('game-mode').value }); }
 
@@ -235,20 +245,18 @@
     socket.on('forceGameView', () => { document.getElementById('lobby-screen').classList.add('hidden'); document.getElementById('game-screen').classList.remove('hidden'); });
 
     socket.on('roundStarted', d => {
-        selectedImg = null; if(document.getElementById('clue-in')) document.getElementById('clue-in').value = "";
-        document.getElementById('lobby-screen').classList.add('hidden'); document.getElementById('game-screen').classList.remove('hidden');
+        selectedImg = null; document.getElementById('lobby-screen').classList.add('hidden'); document.getElementById('game-screen').classList.remove('hidden');
         const isDrawer = (myId === d.drawerId);
-        document.getElementById('clue-display').innerText = isDrawer ? "YOUR TURN: Pick an image and write a clue" : `Waiting for ${d.drawerName} to pick...`;
+        document.getElementById('clue-display').innerText = isDrawer ? "YOUR TURN: Pick an image" : `Waiting for ${d.drawerName}...`;
         document.getElementById('draw-ctrl').className = isDrawer ? "" : "hidden";
         document.getElementById('fake-ctrl').classList.add('hidden'); document.getElementById('vote-ctrl').classList.add('hidden');
         if (d.images && d.images.length > 0) render(d.images, isDrawer);
-        else document.getElementById('grid').innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 50px; opacity: 0.5;">The drawer is picking...</div>';
     });
 
     socket.on('showClue', d => {
         document.getElementById('clue-display').innerText = `CLUE: ${d.clue}`;
-        if(myId !== d.drawerId) { document.getElementById('fake-ctrl').classList.remove('hidden'); if(d.pImages) render(d.pImages, true); }
-        else { document.getElementById('fake-ctrl').classList.add('hidden'); document.getElementById('grid').innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 50px; opacity: 0.5;">Players are picking baits...</div>'; }
+        if(myId !== d.drawerId) { document.getElementById('fake-ctrl').classList.remove('hidden'); render(d.pImages, true); }
+        else document.getElementById('grid').innerHTML = '<div style="opacity:0.5;text-align:center;grid-column:1/-1">Players are picking baits...</div>';
     });
 
     socket.on('startVoting', d => {
@@ -273,35 +281,29 @@
         images.forEach((url, index) => {
             const c = document.createElement('div'); c.className = 'image-card'; c.innerHTML = `<img src="${url}">`;
             if (canSelect) c.onclick = () => { document.querySelectorAll('.image-card').forEach(x => x.classList.remove('selected')); c.classList.add('selected'); selectedImg = url; };
-            g.appendChild(c); setTimeout(() => { c.classList.add('reveal'); }, index * 100);
+            g.appendChild(c); setTimeout(() => c.classList.add('reveal'), index * 100);
         });
     }
 
     function sendAction(t) {
-        if (!selectedImg) return alert("Pick an image!");
-        if (t === 'submitClue') { const val = document.getElementById('clue-in').value; if(!val) return alert("Write a clue!"); socket.emit('submitClue', { image: selectedImg, clue: val }); document.getElementById('draw-ctrl').classList.add('hidden'); }
+        if (!selectedImg) return alert("Pick image!");
+        if (t === 'submitClue') { const v = document.getElementById('clue-in').value; if(!v) return alert("Clue!"); socket.emit('submitClue', { image: selectedImg, clue: v }); document.getElementById('draw-ctrl').classList.add('hidden'); }
         else if (t === 'submitFake') { socket.emit('submitFake', selectedImg); document.getElementById('fake-ctrl').classList.add('hidden'); }
         else if (t === 'submitVote') { socket.emit('submitVote', selectedImg); document.getElementById('vote-ctrl').classList.add('hidden'); }
     }
 
     function sendChat() { const i = document.getElementById('chat-in'); if(i.value) { socket.emit('sendChat', i.value); i.value = ""; } }
-    
     socket.on('newChat', d => {
-        const c = document.getElementById('chat-messages');
-        c.innerHTML += `<div><b>${d.sender}:</b> ${d.text}</div>`;
-        c.scrollTop = c.scrollHeight;
+        document.getElementById('chat-messages').innerHTML += `<div><b>${d.sender}:</b> ${d.text}</div>`;
         if (document.getElementById('chat-modal').style.display !== 'flex') {
             document.getElementById('chat-btn-sidebar').classList.add('has-notification');
             document.getElementById('chat-btn-mobile').classList.add('has-notification');
         }
     });
-
     socket.on('timerUpdate', t => { const e = document.getElementById('timer'); e.innerText = t; if (t <= 10) e.classList.add('low-time'); else e.classList.remove('low-time'); });
-    
     socket.on('gameOver', d => { 
         toggleModal('leaderboard-overlay'); 
-        const l = document.getElementById('final-list'); 
-        l.innerHTML = d.leaderboard.map(p => `<div style="display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid rgba(255,255,255,0.1)"><span>${p.name}</span><b>${p.score}</b></div>`).join(''); 
+        document.getElementById('final-list').innerHTML = d.leaderboard.map(p => `<div>${p.name}: ${p.score}</div>`).join(''); 
         localStorage.removeItem('pix_room'); 
     });
 </script>
