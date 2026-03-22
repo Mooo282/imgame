@@ -36,6 +36,7 @@
             100% { background-position: 0% 50%; } 
         }
 
+        /* Sidebar Style */
         #sidebar { 
             width: 300px; 
             background: rgba(0,0,0,0.5); 
@@ -64,6 +65,7 @@
         .player-card.is-drawer { border-color: var(--primary); box-shadow: 0 0 10px var(--primary); }
         .score-badge { border-radius: 20px; padding: 2px 10px; font-weight: 900; color: #000; font-size: 0.8em; }
 
+        /* Main Area */
         #main-stage { flex: 1; padding: 20px; position: relative; }
         .game-area { 
             background: var(--card-bg); 
@@ -108,10 +110,7 @@
         #timer.low-time { color: #ff4757; animation: blink 0.8s infinite; }
         @keyframes blink { 50% { opacity: 0.7; } }
 
-        .has-notification { position: relative; animation: pulse-red 1.5s infinite !important; border-color: #ff4757 !important; }
-        .has-notification::after { content: ""; position: absolute; top: 5px; right: 5px; width: 10px; height: 10px; background: #ff4757; border-radius: 50%; border: 2px solid var(--bg); z-index: 10; }
-        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(255, 71, 87, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0); } }
-
+        /* Modal Styles */
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(15px); display: none; justify-content: center; align-items: center; z-index: 5000; }
         .modal-content { background: var(--bg); border: 1px solid var(--glass); padding: 25px; border-radius: 30px; width: 90%; max-width: 400px; }
         
@@ -132,6 +131,7 @@
 </head>
 <body>
 
+<!-- Entry Screen -->
 <div id="name-screen" style="position:fixed; inset:0; background:var(--bg); z-index:10000; display:flex; justify-content:center; align-items:center;">
     <div class="game-area" style="width:320px; text-align:center;">
         <h1 style="color:var(--primary); margin-bottom: 25px;">PixDeception</h1>
@@ -140,7 +140,7 @@
             <button onclick="showEntryForm('join')" class="btn-glow" style="background: var(--glass); border: 1px solid var(--glass);">Join Room</button>
         </div>
         <div id="entry-form" class="hidden">
-            <input type="text" id="nick" class="modern-input" placeholder="Nickname..." autocomplete="off" spellcheck="false">
+            <input type="text" id="nick" class="modern-input" placeholder="Nickname..." autocomplete="off">
             <input type="text" id="room-id" class="modern-input" placeholder="Room ID..." autocomplete="off">
             <button id="submit-btn" onclick="processEntry()" class="btn-glow">Enter Game</button>
             <button onclick="showEntryForm('back')" style="background:none; border:none; color:var(--primary); cursor:pointer; margin-top:15px; font-size:0.8em;">← Go Back</button>
@@ -148,6 +148,7 @@
     </div>
 </div>
 
+<!-- Desktop Sidebar -->
 <aside id="sidebar">
     <h2 style="color:var(--primary);">Dreamers</h2>
     <div id="player-list-sidebar"></div>
@@ -156,54 +157,85 @@
     </div>
 </aside>
 
+<!-- Main Game Stage -->
 <main id="main-stage">
     <div class="game-area">
         <div style="position: absolute; top: 15px; left: 25px; display: flex; align-items: center; gap: 8px; font-size: 0.8em; opacity: 0.8; z-index: 10;">
             <span style="color: var(--primary); font-weight: 900; letter-spacing: 1px;">ROOM: <span id="current-room-id">----</span></span>
             <button onclick="copyRoomCode()" style="background: var(--glass); border: 1px solid var(--glass); color: white; cursor: pointer; border-radius: 5px; padding: 2px 8px; font-size: 0.7em;">Copy</button>
-            <span id="copy-toast" style="color: var(--success); font-size: 0.8em; display: none;">Copied!</span>
         </div>
 
+        <!-- Lobby -->
         <div id="lobby-screen" class="hidden">
             <div id="host-controls" class="hidden" style="margin-top: 35px;">
                 <h2>Host Panel</h2>
                 <select id="game-mode" class="modern-input"><option value="classic">Standard</option><option value="fun">Server Version</option></select>
                 <select id="win-points" class="modern-input">
-                    <option value="15">15 pts</option><option value="30" selected>30 pts</option><option value="50">50 pts</option>
+                    <option value="15">15 pts</option><option value="30" selected>30 pts</option><option value="60">60 pts</option><option value="75" selected>75 pts</option><option value="90" selected>90 pts</option>
                 </select>
                 <select id="round-timer" class="modern-input">
                     <option value="30">30s</option><option value="60" selected>60s</option><option value="90">90s</option>
                 </select>
                 <button onclick="startGame()" class="btn-glow">Start Match</button>
-                <button onclick="socket.emit('forceEndGame')" class="btn-glow" style="background:#ff4757; margin-top:10px;">End Current Match</button>
             </div>
             <p id="wait-msg" style="text-align:center; padding-top: 50px;">Waiting for Host...</p>
         </div>
 
+        <!-- Game Active -->
         <div id="game-screen" class="hidden">
             <div id="timer">60</div>
             <div id="clue-display" style="text-align:center; font-weight:bold; color:var(--primary); margin-bottom:15px; font-size: 1.2em; margin-top: 20px;"></div>
             <div class="image-grid" id="grid"></div>
             <div id="controls">
                 <div id="draw-ctrl" class="hidden">
-                    <input type="text" id="clue-in" class="modern-input" placeholder="Enter clue..." autocomplete="off" spellcheck="false">
+                    <input type="text" id="clue-in" class="modern-input" placeholder="Enter clue..." autocomplete="off">
                     <button onclick="sendAction('submitClue')" class="btn-glow">Submit Clue</button>
                 </div>
-                <div id="fake-ctrl" class="hidden"><button onclick="sendAction('submitFake')" class="btn-glow" style="background:var(--secondary)">Confirm Fake</button></div>
-                <div id="vote-ctrl" class="hidden"><button onclick="sendAction('submitVote')" class="btn-glow" style="background:var(--success)">Vote Now</button></div>
+                <div id="fake-ctrl" class="hidden">
+                    <button onclick="sendAction('submitFake')" class="btn-glow" style="background:var(--secondary)">Confirm Fake</button>
+                </div>
+                <div id="vote-ctrl" class="hidden">
+                    <button onclick="sendAction('submitVote')" class="btn-glow" style="background:var(--success)">Vote Now</button>
+                </div>
             </div>
         </div>
     </div>
 </main>
 
+<!-- Mobile Navigation -->
 <div class="mobile-nav">
     <button class="nav-btn" onclick="toggleModal('players-modal')">👤</button>
     <button class="nav-btn" onclick="toggleModal('chat-modal')">💬</button>
 </div>
 
-<div id="chat-modal" class="modal"><div class="modal-content"><span onclick="toggleModal('chat-modal')" style="float:right; cursor:pointer;">✖</span><h3>Chat</h3><div id="chat-messages" style="height:200px; overflow-y:auto; margin-bottom:10px; background:rgba(0,0,0,0.2); padding:10px; border-radius:10px;"></div><div style="display:flex; gap:5px;"><input type="text" id="chat-in" class="modern-input" autocomplete="off" spellcheck="false" style="margin:0"><button onclick="sendChat()" class="btn-glow" style="width:60px; margin:0">Go</button></div></div></div>
-<div id="players-modal" class="modal"><div class="modal-content"><span onclick="toggleModal('players-modal')" style="float:right; cursor:pointer;">✖</span><h3>Players</h3><div id="player-list-mobile"></div></div></div>
-<div id="leaderboard-overlay" class="modal"><div class="modal-content" style="text-align:center"><h2>Game Over 🏆</h2><div id="final-list" style="margin:20px 0"></div><button onclick="location.reload()" class="btn-glow">Play Again</button></div></div>
+<!-- Modals -->
+<div id="chat-modal" class="modal">
+    <div class="modal-content">
+        <span onclick="toggleModal('chat-modal')" style="float:right; cursor:pointer;">✖</span>
+        <h3>Chat</h3>
+        <div id="chat-messages" style="height:200px; overflow-y:auto; margin-bottom:10px; background:rgba(0,0,0,0.2); padding:10px; border-radius:10px;"></div>
+        <div style="display:flex; gap:5px;">
+            <input type="text" id="chat-in" class="modern-input" autocomplete="off" style="margin:0">
+            <button onclick="sendChat()" class="btn-glow" style="width:60px; margin:0">Send</button>
+        </div>
+    </div>
+</div>
+
+<div id="players-modal" class="modal">
+    <div class="modal-content">
+        <span onclick="toggleModal('players-modal')" style="float:right; cursor:pointer;">✖</span>
+        <h3>Players</h3>
+        <div id="player-list-mobile"></div>
+    </div>
+</div>
+
+<div id="leaderboard-overlay" class="modal">
+    <div class="modal-content" style="text-align:center">
+        <h2>Game Over 🏆</h2>
+        <div id="final-list" style="margin:20px 0"></div>
+        <button onclick="location.reload()" class="btn-glow">Play Again</button>
+    </div>
+</div>
 
 <script>
     const socket = io();
@@ -214,19 +246,14 @@
 
     function copyRoomCode() {
         const code = document.getElementById('current-room-id').innerText;
-        if (code === "----") return;
-        navigator.clipboard.writeText(code).then(() => {
-            const toast = document.getElementById('copy-toast');
-            toast.style.display = 'inline';
-            setTimeout(() => { toast.style.display = 'none'; }, 2000);
-        });
+        if (code !== "----") navigator.clipboard.writeText(code);
     }
 
     function showEntryForm(mode) {
         const options = document.getElementById('entry-options');
         const form = document.getElementById('entry-form');
-        const roomIdInput = document.getElementById('room-id');
-        const submitBtn = document.getElementById('submit-btn');
+        const rid = document.getElementById('room-id');
+        const btn = document.getElementById('submit-btn');
 
         if (mode === 'back') {
             options.classList.remove('hidden');
@@ -239,14 +266,13 @@
         form.classList.remove('hidden');
 
         if (mode === 'create') {
-            const randomRoom = Math.floor(10000 + Math.random() * 90000);
-            roomIdInput.value = randomRoom;
-            roomIdInput.readOnly = true;
-            submitBtn.innerText = "Create & Enter";
+            rid.value = Math.floor(10000 + Math.random() * 90000);
+            rid.readOnly = true;
+            btn.innerText = "Create & Enter";
         } else {
-            roomIdInput.value = "";
-            roomIdInput.readOnly = false;
-            submitBtn.innerText = "Join Room";
+            rid.value = "";
+            rid.readOnly = false;
+            btn.innerText = "Join Room";
         }
     }
 
@@ -255,20 +281,12 @@
         const r = document.getElementById('room-id').value;
         if(!n || !r) return alert("All fields are required!");
         document.getElementById('current-room-id').innerText = r;
-        localStorage.setItem('pix_name', n);
         socket.emit('joinGame', { userId: myId, name: n, roomId: r, action: entryMode });
     }
 
     function toggleModal(id) {
         const m = document.getElementById(id);
-        const isOpening = (m.style.display !== 'flex');
-        m.style.display = isOpening ? 'flex' : 'none';
-        if (id === 'chat-modal' && isOpening) {
-            document.querySelectorAll('button[onclick*="chat-modal"]').forEach(btn => {
-                btn.classList.remove('has-notification');
-                btn.style.boxShadow = "none";
-            });
-        }
+        m.style.display = (m.style.display !== 'flex') ? 'flex' : 'none';
     }
 
     socket.on('joinSuccess', () => {
@@ -278,18 +296,20 @@
 
     socket.on('errorMsg', (msg) => { alert(msg); showEntryForm('back'); });
 
-    function startGame() { socket.emit('requestStart', { targetPoints: document.getElementById('win-points').value, roundTime: document.getElementById('round-timer').value, mode: document.getElementById('game-mode').value }); }
+    function startGame() { 
+        socket.emit('requestStart', { 
+            targetPoints: document.getElementById('win-points').value, 
+            roundTime: document.getElementById('round-timer').value, 
+            mode: document.getElementById('game-mode').value 
+        }); 
+    }
 
     socket.on('updatePlayerList', d => {
         const sL = document.getElementById('player-list-sidebar'); 
         const mL = document.getElementById('player-list-mobile'); 
         sL.innerHTML = mL.innerHTML = "";
         
-        if (myId === d.hostId && d.gameState === "LOBBY") {
-            document.getElementById('host-controls').classList.remove('hidden');
-        } else {
-            document.getElementById('host-controls').classList.add('hidden');
-        }
+        document.getElementById('host-controls').className = (myId === d.hostId && d.gameState === "LOBBY") ? "" : "hidden";
 
         d.players.forEach(id => {
             const dr = (id === d.currentDrawerId) ? "is-drawer" : "";
@@ -308,24 +328,23 @@
         if(document.getElementById('clue-in')) document.getElementById('clue-in').value = "";
         document.getElementById('lobby-screen').classList.add('hidden');
         document.getElementById('game-screen').classList.remove('hidden');
+        
         const isDrawer = (myId === d.drawerId);
         document.getElementById('clue-display').innerText = isDrawer ? "YOUR TURN: Pick an image and write a clue" : `Waiting for ${d.drawerName} to pick...`;
+        
         document.getElementById('draw-ctrl').className = isDrawer ? "" : "hidden";
-        if (d.images && d.images.length > 0) {
-            render(d.images, isDrawer);
-        } else {
-            document.getElementById('grid').innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 50px; opacity: 0.5;">The drawer is picking an image...</div>';
-        }
+        if (d.images && d.images.length > 0) render(d.images, isDrawer);
+        else document.getElementById('grid').innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 50px; opacity: 0.5;">Drawer is picking...</div>';
     });
 
     socket.on('showClue', d => {
         document.getElementById('clue-display').innerText = `CLUE: ${d.clue}`;
         if(myId !== d.drawerId) {
             document.getElementById('fake-ctrl').classList.remove('hidden');
-            if(d.pImages && d.pImages.length > 0) render(d.pImages, true);
+            if(d.pImages) render(d.pImages, true);
         } else {
             document.getElementById('fake-ctrl').classList.add('hidden');
-            document.getElementById('grid').innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 50px; opacity: 0.5;">Players are picking their baits...</div>';
+            document.getElementById('grid').innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 50px; opacity: 0.5;">Players are picking baits...</div>';
         }
     });
 
@@ -356,9 +375,16 @@
     function render(images, canSelect) {
         const g = document.getElementById('grid'); g.innerHTML = "";
         images.forEach((url, index) => {
-            const c = document.createElement('div'); c.className = 'image-card';
+            const c = document.createElement('div'); 
+            c.className = 'image-card'; 
             c.innerHTML = `<img src="${url}">`;
-            if (canSelect) c.onclick = () => { document.querySelectorAll('.image-card').forEach(x => x.classList.remove('selected')); c.classList.add('selected'); selectedImg = url; };
+            if (canSelect) {
+                c.onclick = () => { 
+                    document.querySelectorAll('.image-card').forEach(x => x.classList.remove('selected')); 
+                    c.classList.add('selected'); 
+                    selectedImg = url; 
+                };
+            }
             g.appendChild(c);
             setTimeout(() => { c.classList.add('reveal'); }, index * 100);
         });
@@ -380,24 +406,31 @@
         }
     }
 
-    function sendChat() { const i = document.getElementById('chat-in'); if(i.value) { socket.emit('sendChat', i.value); i.value = ""; } }
-    
-    socket.on('newChat', d => {
-        const c = document.getElementById('chat-messages');
-        c.innerHTML += `<div><b>${d.sender}:</b> ${d.text}</div>`;
-        c.scrollTop = c.scrollHeight;
-        const chatModal = document.getElementById('chat-modal');
-        if (chatModal.style.display !== 'flex') {
-            document.querySelectorAll('button[onclick*="chat-modal"]').forEach(btn => {
-                if (btn.classList.contains('nav-btn')) btn.classList.add('has-notification');
-                else btn.style.boxShadow = "0 0 15px #ff4757";
-            });
-        }
+    function sendChat() { 
+        const i = document.getElementById('chat-in'); 
+        if(i.value) { socket.emit('sendChat', i.value); i.value = ""; } 
+    }
+
+    socket.on('newChat', d => { 
+        const c = document.getElementById('chat-messages'); 
+        c.innerHTML += `<div><b>${d.sender}:</b> ${d.text}</div>`; 
+        c.scrollTop = c.scrollHeight; 
     });
 
-    socket.on('timerUpdate', t => { const e = document.getElementById('timer'); e.innerText = t; if (t <= 10) e.classList.add('low-time'); else e.classList.remove('low-time'); });
-    socket.on('gameResetByHost', () => { document.getElementById('game-screen').classList.add('hidden'); document.getElementById('leaderboard-overlay').style.display = 'none'; document.getElementById('lobby-screen').classList.remove('hidden'); alert("Match ended by Host."); });
-    socket.on('gameOver', d => { toggleModal('leaderboard-overlay'); const l = document.getElementById('final-list'); l.innerHTML = d.leaderboard.map(p => `<div style="display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid rgba(255,255,255,0.1)"><span>${p.name}</span><b>${p.score}</b></div>`).join(''); });
+    socket.on('timerUpdate', t => { 
+        const e = document.getElementById('timer'); 
+        e.innerText = t; 
+        if (t <= 10) e.classList.add('low-time'); 
+        else e.classList.remove('low-time'); 
+    });
+
+    socket.on('gameResetByHost', () => { location.reload(); });
+
+    socket.on('gameOver', d => { 
+        toggleModal('leaderboard-overlay'); 
+        const l = document.getElementById('final-list'); 
+        l.innerHTML = d.leaderboard.map(p => `<div style="display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid rgba(255,255,255,0.1)"><span>${p.name}</span><b>${p.score}</b></div>`).join(''); 
+    });
 </script>
 </body>
 </html>
