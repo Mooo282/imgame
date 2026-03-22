@@ -78,7 +78,13 @@ function startTimer(roomId, duration, onTimeout) {
 
 io.on('connection', (socket) => {
     socket.on('joinGame', (data) => {
-        const { userId, name, roomId } = data;
+        const { userId, name, roomId, action } = data;
+        
+        // منع الانضمام إذا كانت الغرفة غير موجودة والاختيار هو "انضمام"
+        if (action === 'join' && !rooms[roomId]) {
+            return socket.emit('errorMsg', 'Room not found! Check the ID.');
+        }
+
         socket.roomId = roomId;
         socket.userId = userId;
         socket.join(roomId);
@@ -97,6 +103,8 @@ io.on('connection', (socket) => {
         }
         
         if (!room.hostId) room.hostId = userId;
+
+        socket.emit('joinSuccess'); // إخبار الواجهة بنجاح الدخول
 
         // المزامنة الفورية (Hot-Join)
         if (room.gameState !== "LOBBY") {
@@ -117,6 +125,9 @@ io.on('connection', (socket) => {
     socket.on('requestStart', (data) => {
         const room = rooms[socket.roomId];
         if (room && room.hostId === socket.userId && room.gameState === "LOBBY") {
+            // تصفير النقاط عند كل بداية مباراة جديدة
+            room.players.forEach(id => room.scores[id] = 0);
+            
             room.targetPoints = parseInt(data.targetPoints);
             room.roundTimeLimit = parseInt(data.roundTime);
             room.currentPool = imagePools[data.mode] || imagePools["classic"];
@@ -131,7 +142,7 @@ io.on('connection', (socket) => {
         
         const lastDrawer = room.currentDrawerId;
 
-        // منطق الطابور العادل ومنع التكرار المتتالي
+        // منطق الطابور ومنع التكرار المتتالي
         if (room.drawerQueue.length === 0) {
             let pool = shuffle([...room.players]);
             if (pool.length > 1 && pool[0] === lastDrawer) {
@@ -244,6 +255,8 @@ io.on('connection', (socket) => {
                 const lb = room.players.map(id => ({ name: room.playerNames[id], score: room.scores[id] })).sort((a,b) => b.score - a.score);
                 io.to(roomId).emit('gameOver', { leaderboard: lb });
                 room.gameState = "LOBBY";
+                // تصفير النقاط فور نهاية المباراة
+                room.players.forEach(id => room.scores[id] = 0);
                 emitPlayerList(roomId);
             } else if(room.players.length > 0) {
                 startNewRound(roomId);
@@ -276,7 +289,6 @@ io.on('connection', (socket) => {
         const room = rooms[rId];
         if (room) {
             setTimeout(() => {
-                // التحقق مما إذا كان اللاعب لا يزال غير متصل (لم يقم بعمل ريفريش)
                 if (!Object.values(socketToUserId).includes(uId)) {
                     room.players = room.players.filter(id => id !== uId);
                     room.drawerQueue = room.drawerQueue.filter(id => id !== uId);
@@ -290,4 +302,4 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(PORT, () => console.log(`PixDeception Multi-Room Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
