@@ -36,7 +36,6 @@
             100% { background-position: 0% 50%; } 
         }
 
-        /* Sidebar Style */
         #sidebar { 
             width: 300px; 
             background: rgba(0,0,0,0.5); 
@@ -65,7 +64,6 @@
         .player-card.is-drawer { border-color: var(--primary); box-shadow: 0 0 10px var(--primary); }
         .score-badge { border-radius: 20px; padding: 2px 10px; font-weight: 900; color: #000; font-size: 0.8em; }
 
-        /* Main Area */
         #main-stage { flex: 1; padding: 20px; position: relative; }
         .game-area { 
             background: var(--card-bg); 
@@ -110,7 +108,6 @@
         #timer.low-time { color: #ff4757; animation: blink 0.8s infinite; }
         @keyframes blink { 50% { opacity: 0.7; } }
 
-        /* Notification */
         .has-notification { position: relative; animation: pulse-red 1.5s infinite !important; border-color: #ff4757 !important; }
         .has-notification::after { content: ""; position: absolute; top: 5px; right: 5px; width: 10px; height: 10px; background: #ff4757; border-radius: 50%; border: 2px solid var(--bg); z-index: 10; }
         @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(255, 71, 87, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0); } }
@@ -138,12 +135,10 @@
 <div id="name-screen" style="position:fixed; inset:0; background:var(--bg); z-index:10000; display:flex; justify-content:center; align-items:center;">
     <div class="game-area" style="width:320px; text-align:center;">
         <h1 style="color:var(--primary); margin-bottom: 25px;">PixDeception</h1>
-        
         <div id="entry-options">
             <button onclick="showEntryForm('create')" class="btn-glow" style="margin-bottom: 15px;">Create New Room</button>
             <button onclick="showEntryForm('join')" class="btn-glow" style="background: var(--glass); border: 1px solid var(--glass);">Join Room</button>
         </div>
-
         <div id="entry-form" class="hidden">
             <input type="text" id="nick" class="modern-input" placeholder="Nickname..." autocomplete="off" spellcheck="false">
             <input type="text" id="room-id" class="modern-input" placeholder="Room ID..." autocomplete="off">
@@ -157,7 +152,6 @@
     <h2 style="color:var(--primary);">Dreamers</h2>
     <div id="player-list-sidebar"></div>
     <div style="margin-top:auto;">
-        <button onclick="socket.emit('toggleReady')" class="btn-glow" style="background:var(--success)">Ready Up</button>
         <button onclick="toggleModal('chat-modal')" class="btn-glow" style="background:rgba(255,255,255,0.05);">Chat 💬</button>
     </div>
 </aside>
@@ -205,7 +199,6 @@
 <div class="mobile-nav">
     <button class="nav-btn" onclick="toggleModal('players-modal')">👤</button>
     <button class="nav-btn" onclick="toggleModal('chat-modal')">💬</button>
-    <button class="nav-btn" onclick="socket.emit('toggleReady')">✅</button>
 </div>
 
 <div id="chat-modal" class="modal"><div class="modal-content"><span onclick="toggleModal('chat-modal')" style="float:right; cursor:pointer;">✖</span><h3>Chat</h3><div id="chat-messages" style="height:200px; overflow-y:auto; margin-bottom:10px; background:rgba(0,0,0,0.2); padding:10px; border-radius:10px;"></div><div style="display:flex; gap:5px;"><input type="text" id="chat-in" class="modern-input" autocomplete="off" spellcheck="false" style="margin:0"><button onclick="sendChat()" class="btn-glow" style="width:60px; margin:0">Go</button></div></div></div>
@@ -261,7 +254,6 @@
         const n = document.getElementById('nick').value;
         const r = document.getElementById('room-id').value;
         if(!n || !r) return alert("All fields are required!");
-
         document.getElementById('current-room-id').innerText = r;
         localStorage.setItem('pix_name', n);
         socket.emit('joinGame', { userId: myId, name: n, roomId: r, action: entryMode });
@@ -300,9 +292,8 @@
         }
 
         d.players.forEach(id => {
-            const ready = d.playerReady[id] ? "✅" : "⏳"; 
             const dr = (id === d.currentDrawerId) ? "is-drawer" : "";
-            const h = `<div class="player-card ${dr}"><span>${ready} ${d.playerNames[id]} ${id===d.hostId?'👑':''}</span><span class="score-badge" style="background:#fff">${d.scores[id]||0}</span></div>`;
+            const h = `<div class="player-card ${dr}"><span>${d.playerNames[id]} ${id===d.hostId?'👑':''}</span><span class="score-badge" style="background:#fff">${d.scores[id]||0}</span></div>`;
             sL.innerHTML += h; mL.innerHTML += h;
         });
     });
@@ -315,15 +306,11 @@
     socket.on('roundStarted', d => {
         selectedImg = null;
         if(document.getElementById('clue-in')) document.getElementById('clue-in').value = "";
-        
         document.getElementById('lobby-screen').classList.add('hidden');
         document.getElementById('game-screen').classList.remove('hidden');
-        
         const isDrawer = (myId === d.drawerId);
         document.getElementById('clue-display').innerText = isDrawer ? "YOUR TURN: Pick an image and write a clue" : `Waiting for ${d.drawerName} to pick...`;
-        
         document.getElementById('draw-ctrl').className = isDrawer ? "" : "hidden";
-        
         if (d.images && d.images.length > 0) {
             render(d.images, isDrawer);
         } else {
