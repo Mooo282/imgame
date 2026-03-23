@@ -30,7 +30,13 @@ function shuffle(array) {
 
 io.on('connection', (socket) => {
     socket.on('joinGame', (data) => {
-        const { roomId, userId, name } = data;
+        const { roomId, userId, name, isJoining } = data;
+
+        // ميزة منع الدخول لغرفة غير موجودة
+        if (isJoining && !rooms[roomId]) {
+            return socket.emit('errorMsg', "Room code not found!");
+        }
+
         socket.join(roomId);
         socket.roomId = roomId;
         socket.userId = userId;
@@ -76,8 +82,8 @@ io.on('connection', (socket) => {
     socket.on('requestStart', (data) => {
         const room = rooms[socket.roomId];
         if (room && socket.userId === room.hostId && room.gameState === "LOBBY") {
-            room.targetPoints = parseInt(data.targetPoints);
-            room.roundTimeLimit = parseInt(data.roundTime);
+            room.targetPoints = parseInt(data.targetPoints) || 30;
+            room.roundTimeLimit = parseInt(data.roundTime) || 60;
             room.currentPool = imagePools[data.mode] || imagePools["classic"];
             startNewRound(socket.roomId);
         }
@@ -151,17 +157,20 @@ io.on('connection', (socket) => {
         room.gameState = "RESULTS";
         let total = room.players.length - 1, correct = 0;
         for (let vId in room.votes) if (room.votes[vId] === room.correctImage) correct++;
+        
         if (correct > 0 && correct < total) {
             room.scores[room.currentDrawerId] += (correct * 2);
             for (let vId in room.votes) if (room.votes[vId] === room.correctImage) room.scores[vId] += 2;
         } else if (correct === total || correct === 0) {
             for (let vId in room.votes) if (room.votes[vId] === room.correctImage) room.scores[vId] += 2;
         }
+        
         for (let vId in room.votes) {
             for (let fId in room.fakeImages) {
                 if (room.votes[vId] === room.fakeImages[fId] && fId !== vId) room.scores[fId] += 1;
             }
         }
+        
         let voteDetails = {}, fakers = {};
         for (let vId in room.votes) { 
             const img = room.votes[vId];
@@ -171,6 +180,7 @@ io.on('connection', (socket) => {
         for (let fId in room.fakeImages) fakers[room.fakeImages[fId]] = room.playerNames[fId];
         io.to(rId).emit('roundFinished', { correctImage: room.correctImage, scores: room.scores, voteDetails, fakers });
         emitPlayerList(rId);
+
         setTimeout(() => {
             if (room.players.some(id => room.scores[id] >= room.targetPoints)) {
                 const lb = room.players.map(id => ({ name: room.playerNames[id], score: room.scores[id] })).sort((a,b) => b.score - a.score);
@@ -223,4 +233,4 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(PORT, () => console.log(`Server on port ${PORT}`));
+server.listen(PORT, () => console.log(`PixDeception Server running on port ${PORT}`));
