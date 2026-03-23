@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -15,10 +15,10 @@
             --success: #34d399; 
         }
 
-        * { box-sizing: border-box; transition: 0.3s; }
+        * { box-sizing: border-box; transition: 0.3s; -webkit-tap-highlight-color: transparent; }
 
         body { 
-            font-family: 'Segoe UI', Tahoma, sans-serif; 
+            font-family: 'Inter', sans-serif; 
             margin: 0; 
             min-height: 100vh; 
             background: linear-gradient(125deg, #0f0c29, #302b63, #24243e); 
@@ -27,11 +27,12 @@
             overflow-x: hidden; 
         }
 
+        /* Sidebar for Desktop */
         #sidebar { 
             width: 300px; 
             background: rgba(0,0,0,0.5); 
             backdrop-filter: blur(30px); 
-            border-left: 1px solid var(--glass); 
+            border-right: 1px solid var(--glass); 
             padding: 25px; 
             display: flex; 
             flex-direction: column; 
@@ -50,17 +51,17 @@
             border: 1px solid var(--glass);
         }
 
-        .image-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px 0; }
+        .image-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 20px 0; }
         
         .image-card { 
             aspect-ratio: 1; 
-            border-radius: 25px; 
+            border-radius: 20px; 
             overflow: hidden; 
             position: relative; 
             border: 4px solid transparent; 
             cursor: pointer; 
             opacity: 0; 
-            transform: translateY(20px); 
+            transform: translateY(15px); 
         }
 
         .image-card.reveal { opacity: 1; transform: translateY(0); }
@@ -69,186 +70,153 @@
         .image-card.correct { border-color: var(--success); box-shadow: 0 0 20px var(--success); }
 
         .btn-glow { 
-            width: 100%; 
-            padding: 14px; 
-            border-radius: 15px; 
-            border: none; 
+            width: 100%; padding: 14px; border-radius: 15px; border: none; 
             background: linear-gradient(135deg, var(--primary), var(--secondary)); 
-            color: white; 
-            font-weight: 800; 
-            cursor: pointer; 
-            margin-top: 10px; 
+            color: white; font-weight: 800; cursor: pointer; margin-top: 10px; 
         }
 
         .modern-input { 
-            width: 100%; 
-            padding: 12px; 
-            border-radius: 12px; 
-            border: 1px solid var(--glass); 
-            background: rgba(0,0,0,0.3); 
-            color: white; 
-            margin-bottom: 10px; 
-            outline: none; 
+            width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--glass); 
+            background: rgba(0,0,0,0.3); color: white; margin-bottom: 10px; outline: none; 
         }
 
-        #timer { font-size: 3em; font-weight: 900; color: var(--secondary); text-align: center; }
-        #timer.low-time { color: #ff4757; animation: blink 0.8s infinite; }
+        #timer { font-size: 2.5em; font-weight: 900; color: var(--secondary); text-align: center; }
+        .low-time { color: #ff4757 !important; animation: blink 0.8s infinite; }
         @keyframes blink { 50% { opacity: 0.5; } }
 
         .modal { 
-            position: fixed; 
-            inset: 0; 
-            background: rgba(0,0,0,0.85); 
-            backdrop-filter: blur(15px); 
-            display: none; 
-            justify-content: center; 
-            align-items: center; 
-            z-index: 5000; 
+            position: fixed; inset: 0; background: rgba(0,0,0,0.85); 
+            backdrop-filter: blur(15px); display: none; justify-content: center; 
+            align-items: center; z-index: 5000; 
         }
 
         .modal-content { 
-            background: var(--bg); 
-            border: 1px solid var(--glass); 
-            padding: 30px; 
-            border-radius: 30px; 
-            width: 90%; 
-            max-width: 400px; 
+            background: var(--bg); border: 1px solid var(--glass); 
+            padding: 25px; border-radius: 30px; width: 90%; max-width: 400px; 
         }
 
         .player-card { 
-            background: rgba(255,255,255,0.05); 
-            padding: 12px; 
-            border-radius: 15px; 
-            margin-bottom: 10px; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
+            background: rgba(255,255,255,0.05); padding: 10px; border-radius: 15px; 
+            margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; 
         }
 
         .is-drawer { border: 1px solid var(--primary); box-shadow: 0 0 10px var(--primary); }
         .hidden { display: none !important; }
         
-        .reveal-header { position: absolute; top: 0; left: 0; right: 0; font-size: 11px; font-weight: 900; text-align: center; padding: 5px; z-index: 5; }
-        .reveal-footer { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.8); color: #fff; font-size: 11px; padding: 6px; text-align: center; }
+        .reveal-header { position: absolute; top: 0; left: 0; right: 0; font-size: 10px; font-weight: 900; text-align: center; padding: 4px; z-index: 5; }
+        .reveal-footer { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.8); color: #fff; font-size: 10px; padding: 4px; text-align: center; }
         
-        .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        /* Mobile Navbar Icons */
+        .mobile-nav { 
+            display: none; position: fixed; bottom: 0; left: 0; right: 0; 
+            height: 70px; background: rgba(15, 12, 41, 0.95); 
+            backdrop-filter: blur(20px); border-top: 1px solid var(--glass); 
+            justify-content: space-around; align-items: center; z-index: 4000; 
+        }
+
+        .nav-btn { 
+            background: none; border: none; color: white; font-size: 24px; cursor: pointer; 
+            display: flex; flex-direction: column; align-items: center; 
+        }
 
         @media (max-width: 850px) {
             #sidebar { display: none; }
+            .mobile-nav { display: flex; }
+            #main-stage { padding-bottom: 90px; }
             .image-grid { grid-template-columns: repeat(2, 1fr); }
+            .game-area { padding: 15px; border-radius: 20px; }
         }
     </style>
 </head>
 <body>
 
-<!-- شاشة الدخول (إنشاء/انضمام) -->
+<!-- Login Screen -->
 <div id="name-screen" class="modal" style="display:flex;">
     <div class="modal-content" style="text-align:center;">
-        <h1 style="color:var(--primary); margin-bottom:20px;">PixDeception</h1>
-        <input type="text" id="nick" class="modern-input" placeholder="اسمك المستعار...">
-        
-        <div class="tabs">
-            <button onclick="switchTab(true)" id="t-create" class="btn-glow" style="margin:0; background:var(--primary)">إنشاء غرفة</button>
-            <button onclick="switchTab(false)" id="t-join" class="btn-glow" style="margin:0; background:var(--glass)">انضمام لكود</button>
+        <h1 style="color:var(--primary)">PixDeception</h1>
+        <input type="text" id="nick" class="modern-input" placeholder="Nickname...">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0;">
+            <button onclick="switchTab(true)" id="t-create" class="btn-glow" style="margin:0; background:var(--primary)">Create</button>
+            <button onclick="switchTab(false)" id="t-join" class="btn-glow" style="margin:0; background:var(--glass)">Join</button>
         </div>
-
-        <div id="create-box">
-            <button onclick="processEntry(true)" class="btn-glow">إنشاء غرفة جديدة</button>
-        </div>
+        <div id="create-box"><button onclick="processEntry(true)" class="btn-glow">Create New Room</button></div>
         <div id="join-box" class="hidden">
-            <input type="text" id="room-input" class="modern-input" placeholder="أدخل كود الغرفة هنا...">
-            <button onclick="processEntry(false)" class="btn-glow" style="background:var(--success)">دخول الغرفة</button>
+            <input type="text" id="room-input" class="modern-input" placeholder="Room Code...">
+            <button onclick="processEntry(false)" class="btn-glow" style="background:var(--success)">Enter Game</button>
         </div>
     </div>
 </div>
 
-<!-- القائمة الجانبية -->
+<!-- Desktop Sidebar -->
 <aside id="sidebar">
-    <h2 id="room-code-title" style="color:var(--primary); text-align:center;">غرفة: ----</h2>
-    <div id="player-list" style="flex:1; overflow-y:auto;"></div>
-    <div style="margin-top:auto;">
-        <button onclick="socket.emit('toggleReady')" class="btn-glow" style="background:var(--success)">جاهز ✅</button>
-        <button onclick="toggleModal('chat-modal')" class="btn-glow" style="background:var(--glass);">المحادثة 💬</button>
-    </div>
+    <h2 id="room-code-side" style="color:var(--primary); text-align:center; font-size: 1.2em;">Room: ----</h2>
+    <div id="player-list-side" style="flex:1; overflow-y:auto;"></div>
+    <button onclick="socket.emit('toggleReady')" class="btn-glow" style="background:var(--success)">Ready Up</button>
 </aside>
 
-<!-- الساحة الرئيسية -->
+<!-- Main Stage -->
 <main id="main-stage">
     <div class="game-area">
-        <!-- شاشة الانتظار (Lobby) -->
         <div id="lobby-screen">
             <div id="host-controls" class="hidden">
-                <h3 style="text-align:center">إعدادات المضيف</h3>
-                <label>نمط الصور:</label>
-                <select id="game-mode" class="modern-input">
-                    <option value="classic">كلاسيك (Standard)</option>
-                    <option value="fun">منوعات (Server Edition)</option>
-                </select>
-                <label>نقاط الفوز:</label>
-                <select id="win-points" class="modern-input">
-                    <option value="15">15 نقطة</option>
-                    <option value="30" selected>30 نقطة</option>
-                    <option value="50">50 نقطة</option>
-                </select>
-                <label>وقت الجولة:</label>
-                <select id="round-timer" class="modern-input">
-                    <option value="30">30 ثانية</option>
-                    <option value="60" selected>60 ثانية</option>
-                    <option value="90">90 ثانية</option>
-                </select>
-                <button onclick="startGame()" class="btn-glow">بدء المباراة الآن</button>
+                <h3 style="text-align:center">Host Panel</h3>
+                <select id="game-mode" class="modern-input"><option value="classic">Classic</option><option value="fun">Fun Edition</option></select>
+                <select id="win-points" class="modern-input"><option value="15">15 pts</option><option value="30" selected>30 pts</option></select>
+                <select id="round-timer" class="modern-input"><option value="30">30s</option><option value="60" selected>60s</option></select>
+                <button onclick="startGame()" class="btn-glow">Start Match</button>
             </div>
-            <div id="wait-msg" style="text-align:center; padding:40px;">
-                <p>بانتظار مضيف الغرفة لبدء المباراة...</p>
-                <p style="font-size:0.8em; opacity:0.6;">تأكد من الضغط على "جاهز" في القائمة الجانبية</p>
-            </div>
+            <p id="wait-msg" style="text-align:center; padding:20px;">Waiting for Host to start...</p>
         </div>
 
-        <!-- شاشة اللعب الفعلي -->
         <div id="game-screen" class="hidden">
             <div id="timer">60</div>
-            <div id="clue-display" style="text-align:center; font-weight:bold; color:var(--primary); margin:15px 0; font-size: 1.4em;"></div>
-            
+            <div id="clue-display" style="text-align:center; font-weight:bold; color:var(--primary); margin:10px 0;"></div>
             <div class="image-grid" id="grid"></div>
-
             <div id="controls">
-                <!-- واجهة الرسام -->
                 <div id="draw-ctrl" class="hidden">
-                    <input type="text" id="clue-in" class="modern-input" placeholder="اكتب تلميحاً ذكياً عن الصورة..." autocomplete="off">
-                    <button onclick="sendAction('submitClue')" class="btn-glow">إرسال التلميح</button>
+                    <input type="text" id="clue-in" class="modern-input" placeholder="Enter clue...">
+                    <button onclick="sendAction('submitClue')" class="btn-glow">Send Clue</button>
                 </div>
-                <!-- واجهة التمويه -->
-                <div id="fake-ctrl" class="hidden">
-                    <button onclick="sendAction('submitFake')" class="btn-glow" style="background:var(--secondary)">تأكيد صورة التمويه</button>
-                </div>
-                <!-- واجهة التصويت -->
-                <div id="vote-ctrl" class="hidden">
-                    <button onclick="sendAction('submitVote')" class="btn-glow" style="background:var(--success)">صوّت على الصورة الأصلية</button>
-                </div>
+                <div id="fake-ctrl" class="hidden"><button onclick="sendAction('submitFake')" class="btn-glow" style="background:var(--secondary)">Submit Fake</button></div>
+                <div id="vote-ctrl" class="hidden"><button onclick="sendAction('submitVote')" class="btn-glow" style="background:var(--success)">Vote Now</button></div>
             </div>
         </div>
     </div>
 </main>
 
-<!-- نافذة المحادثة -->
+<!-- Mobile Navigation Bar -->
+<div class="mobile-nav">
+    <button class="nav-btn" onclick="toggleModal('players-modal')">👤</button>
+    <button class="nav-btn" onclick="toggleModal('chat-modal')">💬</button>
+    <button class="nav-btn" onclick="socket.emit('toggleReady')">✅</button>
+</div>
+
+<!-- Modals -->
 <div id="chat-modal" class="modal">
     <div class="modal-content">
-        <span onclick="toggleModal('chat-modal')" style="float:left; cursor:pointer; font-weight:bold;">✖</span>
-        <h3>المحادثة</h3>
-        <div id="chat-msgs" style="height:250px; overflow-y:auto; background:rgba(0,0,0,0.3); padding:15px; border-radius:15px; margin-bottom:15px;"></div>
-        <div style="display:flex; gap:8px;">
-            <input type="text" id="chat-in" class="modern-input" style="margin:0;" placeholder="اكتب رسالة...">
-            <button onclick="sendChat()" class="btn-glow" style="width:70px; margin:0;">إرسال</button>
+        <span onclick="toggleModal('chat-modal')" style="float:right; cursor:pointer;">✖</span>
+        <h3>Chat</h3>
+        <div id="chat-msgs" style="height:250px; overflow-y:auto; background:rgba(0,0,0,0.2); padding:10px; border-radius:10px; margin-bottom:10px;"></div>
+        <div style="display:flex; gap:5px;">
+            <input type="text" id="chat-in" class="modern-input" style="margin:0;" placeholder="Message...">
+            <button onclick="sendChat()" class="btn-glow" style="width:60px; margin:0;">Go</button>
         </div>
     </div>
 </div>
 
-<!-- شاشة النهاية -->
+<div id="players-modal" class="modal">
+    <div class="modal-content">
+        <span onclick="toggleModal('players-modal')" style="float:right; cursor:pointer;">✖</span>
+        <h3 id="room-code-mob">Players</h3>
+        <div id="player-list-mob"></div>
+    </div>
+</div>
+
 <div id="leaderboard-overlay" class="modal">
     <div class="modal-content" style="text-align:center;">
-        <h2 style="color:gold;">انتهت المباراة! 🏆</h2>
-        <div id="final-list" style="margin:20px 0;"></div>
-        <button onclick="location.reload()" class="btn-glow">العودة للرئيسية</button>
+        <h2>Game Over 🏆</h2>
+        <div id="final-list"></div>
+        <button onclick="location.reload()" class="btn-glow">Home</button>
     </div>
 </div>
 
@@ -258,7 +226,6 @@
     localStorage.setItem('pix_uid', myId);
     let selectedImg = null;
 
-    // التبديل بين إنشاء وانضمام
     function switchTab(isCreate) {
         document.getElementById('create-box').classList.toggle('hidden', !isCreate);
         document.getElementById('join-box').classList.toggle('hidden', isCreate);
@@ -266,19 +233,11 @@
         document.getElementById('t-join').style.background = !isCreate ? "var(--primary)" : "var(--glass)";
     }
 
-    // معالجة الدخول للغرفة
     function processEntry(isNew) {
-        const name = document.getElementById('nick').value.trim();
-        let roomId;
-        if (isNew) {
-            roomId = Math.random().toString(36).substring(2, 6).toUpperCase();
-        } else {
-            roomId = document.getElementById('room-input').value.trim().toUpperCase();
-        }
-
-        if(!name || !roomId) return alert("يرجى إدخال اسمك وكود الغرفة!");
-        
-        socket.emit('joinGame', { roomId, userId: myId, name });
+        const n = document.getElementById('nick').value;
+        const r = isNew ? Math.random().toString(36).substring(2, 6).toUpperCase() : document.getElementById('room-input').value.toUpperCase();
+        if(!n || !r) return alert("Enter Name & Code!");
+        socket.emit('joinGame', { roomId: r, userId: myId, name: n });
         document.getElementById('name-screen').style.display = 'none';
     }
 
@@ -295,152 +254,112 @@
         });
     }
 
-    // تحديث قائمة اللاعبين
     socket.on('updatePlayerList', d => {
-        document.getElementById('room-code-title').innerText = "غرفة: " + d.roomId;
-        const list = document.getElementById('player-list');
-        list.innerHTML = "";
+        document.getElementById('room-code-side').innerText = "Room: " + d.roomId;
+        document.getElementById('room-code-mob').innerText = "Players (Room: " + d.roomId + ")";
+        const listSide = document.getElementById('player-list-side');
+        const listMob = document.getElementById('player-list-mob');
+        listSide.innerHTML = listMob.innerHTML = "";
         
-        // إظهار تحكم الهوست
-        if (myId === d.hostId && d.gameState === "LOBBY") {
-            document.getElementById('host-controls').classList.remove('hidden');
-            document.getElementById('wait-msg').classList.add('hidden');
-        } else if (d.gameState === "LOBBY") {
-            document.getElementById('host-controls').classList.add('hidden');
-            document.getElementById('wait-msg').classList.remove('hidden');
-        }
+        if (myId === d.hostId && d.gameState === "LOBBY") document.getElementById('host-controls').classList.remove('hidden');
+        else document.getElementById('host-controls').classList.add('hidden');
 
         d.players.forEach(id => {
             const ready = d.playerReady[id] ? "✅" : "⏳";
-            const drawerClass = (id === d.currentDrawerId) ? "is-drawer" : "";
-            list.innerHTML += `
-                <div class="player-card ${drawerClass}">
-                    <span>${ready} ${d.playerNames[id]} ${id===d.hostId?'👑':''}</span>
-                    <b style="color:var(--primary)">${d.scores[id]||0}</b>
-                </div>`;
+            const dr = (id === d.currentDrawerId) ? "is-drawer" : "";
+            const html = `<div class="player-card ${dr}"><span>${ready} ${d.playerNames[id]}</span><b>${d.scores[id]||0}</b></div>`;
+            listSide.innerHTML += html; listMob.innerHTML += html;
         });
     });
 
-    // بداية الجولة
     socket.on('roundStarted', d => {
         selectedImg = null;
         document.getElementById('lobby-screen').classList.add('hidden');
         document.getElementById('game-screen').classList.remove('hidden');
-        
         const isDrawer = (myId === d.drawerId);
-        document.getElementById('clue-display').innerText = isDrawer ? "دورك: اختر صورة واكتب تلميحاً" : `بانتظار ${d.drawerName} لاختيار صورة...`;
-        
+        document.getElementById('clue-display').innerText = isDrawer ? "PICK A PICTURE & CLUE" : `Wait for ${d.drawerName}...`;
         document.getElementById('draw-ctrl').className = isDrawer ? "" : "hidden";
-        document.getElementById('fake-ctrl').className = "hidden";
-        document.getElementById('vote-ctrl').className = "hidden";
-
-        renderGrid(d.images, isDrawer);
+        render(d.images, isDrawer);
     });
 
-    // عرض التلميح للاعبين
     socket.on('showClue', d => {
-        document.getElementById('clue-display').innerText = `التلميح: ${d.clue}`;
+        document.getElementById('clue-display').innerText = `CLUE: ${d.clue}`;
         if(myId !== d.drawerId) {
             document.getElementById('fake-ctrl').classList.remove('hidden');
-            renderGrid(d.pImages, true);
-        } else {
-            document.getElementById('grid').innerHTML = '<p style="grid-column: 1/-1; text-align: center; padding: 40px; opacity: 0.5;">اللاعبون يختارون صور التمويه الآن...</p>';
+            render(d.pImages, true);
         }
     });
 
-    // بدء التصويت
     socket.on('startVoting', d => {
         document.getElementById('fake-ctrl').classList.add('hidden');
-        document.getElementById('clue-display').innerText = "أي صورة قصدها الرسام؟";
+        document.getElementById('clue-display').innerText = "VOTE FOR ORIGINAL!";
         if(myId !== d.drawerId) document.getElementById('vote-ctrl').classList.remove('hidden');
-        renderGrid(d.options, (myId !== d.drawerId));
+        render(d.options, (myId !== d.drawerId));
     });
 
-    // كشف النتائج
     socket.on('roundFinished', d => {
         document.getElementById('vote-ctrl').classList.add('hidden');
-        document.getElementById('clue-display').innerText = "كشف الحقيقة!";
-
         document.querySelectorAll('.image-card').forEach(card => {
             const url = card.querySelector('img').getAttribute('src');
             let html = "";
             if(url === d.correctImage) {
                 card.classList.add('correct');
-                html += `<div class="reveal-header" style="background:var(--success); color:#000">الأصلية ✅</div>`;
+                html += `<div class="reveal-header" style="background:var(--success); color:#000">ORIGINAL</div>`;
             } else if(d.fakers[url]) {
                 card.style.borderColor = "var(--secondary)";
-                html += `<div class="reveal-header" style="background:var(--secondary); color:#fff">تمويه ${d.fakers[url]}</div>`;
+                html += `<div class="reveal-header" style="background:var(--secondary); color:#fff">${d.fakers[url]}'s Bait</div>`;
             }
             if(d.voteDetails[url]) html += `<div class="reveal-footer">👤 ${d.voteDetails[url].join(", ")}</div>`;
             card.insertAdjacentHTML('beforeend', html);
         });
     });
 
-    // رسم شبكة الصور
-    function renderGrid(images, canSelect) {
-        const grid = document.getElementById('grid');
-        grid.innerHTML = "";
+    function render(images, canSelect) {
+        const g = document.getElementById('grid'); g.innerHTML = "";
         images.forEach((url, i) => {
-            const card = document.createElement('div');
-            card.className = 'image-card';
-            card.innerHTML = `<img src="${url}">`;
-            if (canSelect) card.onclick = () => {
+            const c = document.createElement('div'); c.className = 'image-card';
+            c.innerHTML = `<img src="${url}">`;
+            if (canSelect) c.onclick = () => {
                 document.querySelectorAll('.image-card').forEach(x => x.classList.remove('selected'));
-                card.classList.add('selected');
-                selectedImg = url;
+                c.classList.add('selected'); selectedImg = url;
             };
-            grid.appendChild(card);
-            setTimeout(() => card.classList.add('reveal'), i * 100);
+            g.appendChild(c);
+            setTimeout(() => c.classList.add('reveal'), i * 100);
         });
     }
 
-    // إرسال الأفعال
-    function sendAction(type) {
-        if (!selectedImg) return alert("يرجى اختيار صورة أولاً!");
-        if (type === 'submitClue') {
-            const clue = document.getElementById('clue-in').value.trim();
-            if(!clue) return alert("اكتب تلميحاً!");
-            socket.emit('submitClue', { image: selectedImg, clue });
+    function sendAction(t) {
+        if (!selectedImg) return alert("Select image!");
+        if (t === 'submitClue') {
+            const val = document.getElementById('clue-in').value;
+            if(!val) return alert("Clue!");
+            socket.emit('submitClue', { image: selectedImg, clue: val });
             document.getElementById('draw-ctrl').classList.add('hidden');
-        } else if (type === 'submitFake') {
-            socket.emit('submitFake', selectedImg);
-            document.getElementById('fake-ctrl').classList.add('hidden');
-        } else if (type === 'submitVote') {
-            socket.emit('submitVote', selectedImg);
-            document.getElementById('vote-ctrl').classList.add('hidden');
+        } else {
+            socket.emit(t, selectedImg);
+            document.getElementById(t==='submitFake'?'fake-ctrl':'vote-ctrl').classList.add('hidden');
         }
     }
 
-    // المحادثة
     function sendChat() {
-        const input = document.getElementById('chat-in');
-        if(input.value.trim()) {
-            socket.emit('sendChat', input.value);
-            input.value = "";
-        }
+        const i = document.getElementById('chat-in');
+        if(i.value) { socket.emit('sendChat', i.value); i.value = ""; }
     }
 
     socket.on('newChat', d => {
-        const box = document.getElementById('chat-msgs');
-        box.innerHTML += `<div><b style="color:var(--primary)">${d.sender}:</b> ${d.text}</div>`;
-        box.scrollTop = box.scrollHeight;
+        const c = document.getElementById('chat-msgs');
+        c.innerHTML += `<div><b>${d.sender}:</b> ${d.text}</div>`;
+        c.scrollTop = c.scrollHeight;
     });
 
-    // المؤقت
     socket.on('timerUpdate', t => {
-        const el = document.getElementById('timer');
-        el.innerText = t;
-        el.classList.toggle('low-time', t <= 10);
+        const e = document.getElementById('timer'); e.innerText = t;
+        e.classList.toggle('low-time', t <= 10);
     });
 
-    // نهاية اللعبة
     socket.on('gameOver', d => {
-        document.getElementById('leaderboard-overlay').style.display = 'flex';
-        document.getElementById('final-list').innerHTML = d.leaderboard.map((p, i) => `
-            <div class="player-card">
-                <span>${i+1}. ${p.name}</span>
-                <b>${p.score} نقطة</b>
-            </div>`).join('');
+        toggleModal('leaderboard-overlay');
+        document.getElementById('final-list').innerHTML = d.leaderboard.map(p => `<div>${p.name}: ${p.score}</div>`).join('');
     });
 </script>
 </body>
