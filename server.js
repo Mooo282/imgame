@@ -46,7 +46,7 @@ io.on('connection', (socket) => {
                 playerReady: {}, gameState: "LOBBY", currentDrawerId: null,
                 currentPool: [], drawerQueue: [], fakeImages: {}, votes: {},
                 currentClue: "", correctImage: "", gameTimer: null, targetPoints: 30, roundTimeLimit: 60,
-                lastOptions: [] 
+                lastOptions: [], currentRoundImages: [] 
             };
         }
 
@@ -58,9 +58,11 @@ io.on('connection', (socket) => {
 
         emitPlayerList(roomId);
 
+        // --- إصلاح مشكلة الريفرش: إرسال البيانات الحالية فوراً ---
         if (room.gameState !== "LOBBY") {
             if (room.gameState === "DRAWING") {
-                socket.emit('roundStarted', { images: [], drawerId: room.currentDrawerId, drawerName: room.playerNames[room.currentDrawerId] });
+                const imgs = (userId === room.currentDrawerId) ? room.currentRoundImages : [];
+                socket.emit('roundStarted', { images: imgs, drawerId: room.currentDrawerId, drawerName: room.playerNames[room.currentDrawerId] });
             } else if (room.gameState === "FAKING") {
                 const pImages = shuffle(room.currentPool).filter(img => img !== room.correctImage).slice(0, 6);
                 socket.emit('showClue', { clue: room.currentClue, pImages, drawerId: room.currentDrawerId });
@@ -106,12 +108,12 @@ io.on('connection', (socket) => {
         room.gameState = "DRAWING"; room.fakeImages = {}; room.votes = {}; room.currentClue = "";
         if (room.drawerQueue.length === 0) room.drawerQueue = shuffle(room.players);
         room.currentDrawerId = room.drawerQueue.shift();
-        const roundImages = shuffle(room.currentPool).slice(0, 6);
+        room.currentRoundImages = shuffle(room.currentPool).slice(0, 6);
 
         room.players.forEach(pId => {
             const sid = Array.from(io.sockets.adapter.rooms.get(rId) || []).find(s => io.sockets.sockets.get(s).userId === pId);
             if (sid) {
-                const imgs = (pId === room.currentDrawerId) ? roundImages : [];
+                const imgs = (pId === room.currentDrawerId) ? room.currentRoundImages : [];
                 io.to(sid).emit('roundStarted', { images: imgs, drawerId: room.currentDrawerId, drawerName: room.playerNames[room.currentDrawerId] });
             }
         });
@@ -245,4 +247,4 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(PORT, () => console.log(`PixDeception Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
