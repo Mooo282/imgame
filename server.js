@@ -12,6 +12,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname)));
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
+// خزان الصور
 const imagePools = {
     "classic": Array.from({length: 50}, (_, i) => `/images/classic/${i+1}.jpg`),
     "fun": Array.from({length: 50}, (_, i) => `/images/fun/${i+1}.jpg`)
@@ -32,6 +33,7 @@ io.on('connection', (socket) => {
     socket.on('joinGame', (data) => {
         const { roomId, userId, name, isJoining } = data;
 
+        // التحقق من وجود الغرفة عند محاولة الانضمام
         if (isJoining && !rooms[roomId]) {
             return socket.emit('errorMsg', "Room code not found!");
         }
@@ -58,7 +60,7 @@ io.on('connection', (socket) => {
 
         emitPlayerList(roomId);
 
-        // --- إصلاح مشكلة الريفرش: إرسال البيانات الحالية فوراً ---
+        // منطق Hot-Join و Refresh لضمان عدم اختفاء الصور
         if (room.gameState !== "LOBBY") {
             if (room.gameState === "DRAWING") {
                 const imgs = (userId === room.currentDrawerId) ? room.currentRoundImages : [];
@@ -238,13 +240,13 @@ io.on('connection', (socket) => {
                         if (rooms[rId].gameTimer) clearInterval(rooms[rId].gameTimer);
                         delete rooms[rId];
                     } else {
-                        if (uId === rooms[rId].hostId) rooms[rId].hostId = rooms[rId].players;
+                        if (uId === rooms[rId].hostId) rooms[rId].hostId = rooms[rId].players[0];
                         emitPlayerList(rId);
                     }
                 }
-            }, 3000);
+            }, 5000);
         }
     });
 });
 
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`PixDeception Server running on port ${PORT}`));
