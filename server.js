@@ -12,7 +12,6 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname)));
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
-// خزان الصور
 const imagePools = {
     "classic": Array.from({length: 50}, (_, i) => `/images/classic/${i+1}.jpg`),
     "fun": Array.from({length: 50}, (_, i) => `/images/fun/${i+1}.jpg`)
@@ -59,7 +58,6 @@ io.on('connection', (socket) => {
 
         emitPlayerList(roomId);
 
-        // Hot-Join logic
         if (room.gameState !== "LOBBY") {
             if (room.gameState === "DRAWING") {
                 socket.emit('roundStarted', { images: [], drawerId: room.currentDrawerId, drawerName: room.playerNames[room.currentDrawerId] });
@@ -97,7 +95,7 @@ io.on('connection', (socket) => {
         if (room && socket.userId === room.hostId && room.gameState === "LOBBY") {
             room.targetPoints = parseInt(data.targetPoints) || 30;
             room.roundTimeLimit = parseInt(data.roundTime) || 60;
-            room.currentPool = imagePools[data.mode] || imagePools["classic"]; // هنا تم تفعيل المود
+            room.currentPool = imagePools[data.mode] || imagePools["classic"];
             startNewRound(socket.roomId);
         }
     });
@@ -238,7 +236,7 @@ io.on('connection', (socket) => {
                         if (rooms[rId].gameTimer) clearInterval(rooms[rId].gameTimer);
                         delete rooms[rId];
                     } else {
-                        if (uId === rooms[rId].hostId) rooms[rId].hostId = rooms[rId].players[0];
+                        if (uId === rooms[rId].hostId) rooms[rId].hostId = rooms[rId].players;
                         emitPlayerList(rId);
                     }
                 }
