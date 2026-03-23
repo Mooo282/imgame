@@ -12,6 +12,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname)));
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
+// خزان الصور
 const imagePools = {
     "classic": Array.from({length: 50}, (_, i) => `/images/classic/${i+1}.jpg`),
     "fun": Array.from({length: 50}, (_, i) => `/images/fun/${i+1}.jpg`)
@@ -32,7 +33,6 @@ io.on('connection', (socket) => {
     socket.on('joinGame', (data) => {
         const { roomId, userId, name, isJoining } = data;
 
-        // ميزة منع الدخول لغرفة غير موجودة
         if (isJoining && !rooms[roomId]) {
             return socket.emit('errorMsg', "Room code not found!");
         }
@@ -46,7 +46,8 @@ io.on('connection', (socket) => {
                 players: [], scores: {}, playerNames: {}, hostId: userId,
                 playerReady: {}, gameState: "LOBBY", currentDrawerId: null,
                 currentPool: [], drawerQueue: [], fakeImages: {}, votes: {},
-                currentClue: "", correctImage: "", gameTimer: null, targetPoints: 30, roundTimeLimit: 60
+                currentClue: "", correctImage: "", gameTimer: null, targetPoints: 30, roundTimeLimit: 60,
+                lastOptions: [] 
             };
         }
 
@@ -57,6 +58,18 @@ io.on('connection', (socket) => {
         if (room.playerReady[userId] === undefined) room.playerReady[userId] = false;
 
         emitPlayerList(roomId);
+
+        // Hot-Join logic
+        if (room.gameState !== "LOBBY") {
+            if (room.gameState === "DRAWING") {
+                socket.emit('roundStarted', { images: [], drawerId: room.currentDrawerId, drawerName: room.playerNames[room.currentDrawerId] });
+            } else if (room.gameState === "FAKING") {
+                const pImages = shuffle(room.currentPool).filter(img => img !== room.correctImage).slice(0, 6);
+                socket.emit('showClue', { clue: room.currentClue, pImages, drawerId: room.currentDrawerId });
+            } else if (room.gameState === "VOTING") {
+                socket.emit('startVoting', { options: room.lastOptions, drawerId: room.currentDrawerId });
+            }
+        }
     });
 
     function emitPlayerList(rId) {
@@ -84,7 +97,7 @@ io.on('connection', (socket) => {
         if (room && socket.userId === room.hostId && room.gameState === "LOBBY") {
             room.targetPoints = parseInt(data.targetPoints) || 30;
             room.roundTimeLimit = parseInt(data.roundTime) || 60;
-            room.currentPool = imagePools[data.mode] || imagePools["classic"];
+            room.currentPool = imagePools[data.mode] || imagePools["classic"]; // هنا تم تفعيل المود
             startNewRound(socket.roomId);
         }
     });
@@ -138,7 +151,8 @@ io.on('connection', (socket) => {
             let rand = room.currentPool[Math.floor(Math.random()*room.currentPool.length)];
             if(!opts.includes(rand)) opts.push(rand);
         }
-        io.to(rId).emit('startVoting', { options: shuffle(opts), drawerId: room.currentDrawerId });
+        room.lastOptions = shuffle(opts);
+        io.to(rId).emit('startVoting', { options: room.lastOptions, drawerId: room.currentDrawerId });
         startTimer(rId, room.roundTimeLimit, () => finalizeRound(rId));
     }
 

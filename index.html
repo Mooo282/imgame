@@ -3,18 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PixDeception | Rooms Edition</title>
+    <title>PixDeception | Complete Edition</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         :root { --bg: #0f0c29; --card-bg: rgba(255, 255, 255, 0.07); --primary: #a78bfa; --secondary: #f472b6; --glass: rgba(255, 255, 255, 0.15); --success: #34d399; }
         * { box-sizing: border-box; transition: 0.3s; }
         body { font-family: 'Inter', sans-serif; margin: 0; height: 100vh; background: linear-gradient(125deg, #0f0c29, #302b63, #24243e); color: white; display: flex; overflow: hidden; }
 
-        /* Sidebars */
         #sidebar-left { width: 260px; background: rgba(0,0,0,0.4); backdrop-filter: blur(20px); border-right: 1px solid var(--glass); padding: 20px; display: flex; flex-direction: column; }
         #sidebar-right { width: 280px; background: rgba(0,0,0,0.4); backdrop-filter: blur(20px); border-left: 1px solid var(--glass); padding: 20px; display: flex; flex-direction: column; }
-        
-        /* Main Stage with Scroll */
         #main-stage { flex: 1; padding: 20px; overflow-y: auto; position: relative; -webkit-overflow-scrolling: touch; }
         
         .game-area { background: var(--card-bg); backdrop-filter: blur(25px); border-radius: 30px; padding: 20px; max-width: 800px; margin: 0 auto; border: 1px solid var(--glass); }
@@ -29,8 +26,6 @@
         .modern-input { width: 100%; padding: 10px; border-radius: 10px; border: 1px solid var(--glass); background: rgba(0,0,0,0.3); color: white; margin-bottom: 8px; outline: none; }
         
         #timer { font-size: 2.2em; font-weight: 900; color: var(--secondary); text-align: center; }
-        
-        /* Chat Box with Scroll */
         .chat-box { flex: 1; background: rgba(0,0,0,0.2); border-radius: 15px; padding: 10px; overflow-y: auto; margin-bottom: 10px; font-size: 0.9em; scroll-behavior: smooth; }
         .player-card { background: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 12px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
         
@@ -38,7 +33,6 @@
         .modal-content { background: var(--bg); border: 1px solid var(--glass); padding: 20px; border-radius: 25px; width: 90%; max-width: 380px; }
         .hidden { display: none !important; }
 
-        /* Mobile Nav & Notification Dot */
         .mobile-nav { display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 65px; background: rgba(15, 12, 41, 0.98); border-top: 1px solid var(--glass); justify-content: space-around; align-items: center; z-index: 4000; }
         .nav-btn { position: relative; background: none; border: none; color: white; font-size: 22px; cursor: pointer; }
         .dot { position: absolute; top: 0; right: 0; width: 10px; height: 10px; background: #ff4757; border-radius: 50%; display: none; border: 2px solid #000; }
@@ -59,7 +53,7 @@
 <div id="name-screen" class="modal" style="display:flex;">
     <div class="modal-content" style="text-align:center;">
         <h1 style="color:var(--primary); margin:0 0 15px 0;">PixDeception</h1>
-        <input type="text" id="nick" class="modern-input" placeholder="Nickname...">
+        <input type="text" id="nick" class="modern-input" placeholder="Nickname..." autocomplete="off">
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0;">
             <button onclick="switchTab(true)" id="t-create" class="btn-glow" style="margin:0; background:var(--primary)">Create</button>
             <button onclick="switchTab(false)" id="t-join" class="btn-glow" style="margin:0; background:var(--glass)">Join</button>
@@ -83,8 +77,15 @@
         <div id="lobby-screen">
             <div id="host-controls" class="hidden">
                 <h3 style="text-align:center; margin-top:0;">Host Settings</h3>
-                <select id="win-points" class="modern-input"><option value="30">30 pts</option></select>
-                <select id="round-timer" class="modern-input"><option value="60">60s</option></select>
+                <label style="font-size: 0.8em; opacity: 0.7;">Game Mode:</label>
+                <select id="game-mode" class="modern-input">
+                    <option value="classic">Classic Mode</option>
+                    <option value="fun">Fun Edition</option>
+                </select>
+                <label style="font-size: 0.8em; opacity: 0.7;">Target Score:</label>
+                <select id="win-points" class="modern-input"><option value="15">15 pts</option><option value="30" selected>30 pts</option></select>
+                <label style="font-size: 0.8em; opacity: 0.7;">Round Timer:</label>
+                <select id="round-timer" class="modern-input"><option value="30">30s</option><option value="60" selected>60s</option></select>
                 <button onclick="startGame()" class="btn-glow">Start Match</button>
             </div>
             <p id="wait-msg" style="text-align:center; padding:30px; opacity:0.7;">Waiting for Host...</p>
@@ -94,7 +95,7 @@
             <div id="clue-display" style="text-align:center; font-weight:bold; color:var(--primary); font-size:1.1em; margin-bottom:10px;"></div>
             <div class="image-grid" id="grid"></div>
             <div id="controls">
-                <div id="draw-ctrl" class="hidden"><input type="text" id="clue-in" class="modern-input" placeholder="Clue..."><button onclick="sendAction('submitClue')" class="btn-glow">Submit</button></div>
+                <div id="draw-ctrl" class="hidden"><input type="text" id="clue-in" class="modern-input" placeholder="Clue..." autocomplete="off"><button onclick="sendAction('submitClue')" class="btn-glow">Submit</button></div>
                 <div id="fake-ctrl" class="hidden"><button onclick="sendAction('submitFake')" class="btn-glow" style="background:var(--secondary)">Submit Bait</button></div>
                 <div id="vote-ctrl" class="hidden"><button onclick="sendAction('submitVote')" class="btn-glow" style="background:var(--success)">Vote</button></div>
             </div>
@@ -133,6 +134,10 @@
     <div class="modal-content"><span onclick="toggleModal('players-modal')" style="float:right; cursor:pointer;">✖</span><h3 id="room-code-mob">Players</h3><div id="player-list-mob"></div></div>
 </div>
 
+<div id="leaderboard-overlay" class="modal">
+    <div class="modal-content" style="text-align:center;"><h2>Winners! 🏆</h2><div id="final-list"></div><button onclick="location.reload()" class="btn-glow">Home</button></div>
+</div>
+
 <script>
     const socket = io();
     let myId = localStorage.getItem('pix_uid') || 'u_'+Math.random().toString(36).substr(2,9);
@@ -140,7 +145,6 @@
     let selectedImg = null;
     let isChatOpen = false;
 
-    // Auto-Join logic
     window.onload = () => {
         const sN = localStorage.getItem('pix_name'), sR = localStorage.getItem('pix_room');
         if (sN && sR) {
@@ -148,11 +152,7 @@
         }
     };
 
-    socket.on('errorMsg', msg => { 
-        alert(msg); 
-        localStorage.removeItem('pix_room');
-        location.reload(); 
-    });
+    socket.on('errorMsg', msg => { alert(msg); localStorage.removeItem('pix_room'); location.reload(); });
 
     function switchTab(isC) {
         document.getElementById('create-box').classList.toggle('hidden', !isC);
@@ -171,12 +171,15 @@
     }
 
     function toggleModal(id) { const m = document.getElementById(id); m.style.display = (m.style.display === 'flex') ? 'none' : 'flex'; }
-    
     function openChatMob() { isChatOpen = true; document.getElementById('chat-dot').style.display = 'none'; toggleModal('chat-modal'); }
     function closeChatMob() { isChatOpen = false; toggleModal('chat-modal'); }
 
     function startGame() {
-        socket.emit('requestStart', { targetPoints: document.getElementById('win-points').value, roundTime: document.getElementById('round-timer').value, mode: 'classic' });
+        socket.emit('requestStart', { 
+            targetPoints: document.getElementById('win-points').value, 
+            roundTime: document.getElementById('round-timer').value, 
+            mode: document.getElementById('game-mode').value 
+        });
     }
 
     socket.on('updatePlayerList', d => {
@@ -196,17 +199,25 @@
         selectedImg = null;
         document.getElementById('lobby-screen').classList.add('hidden');
         document.getElementById('game-screen').classList.remove('hidden');
-        document.getElementById('clue-display').innerText = (myId === d.drawerId) ? "PICK IMAGE & CLUE" : `WAIT FOR ${d.drawerName}...`;
-        document.getElementById('draw-ctrl').className = (myId === d.drawerId) ? "" : "hidden";
-        render(d.images, (myId === d.drawerId));
+        const isD = (myId === d.drawerId);
+        document.getElementById('clue-display').innerText = isD ? "PICK IMAGE & CLUE" : `WAIT FOR ${d.drawerName}...`;
+        document.getElementById('draw-ctrl').className = isD ? "" : "hidden";
+        document.getElementById('fake-ctrl').className = "hidden";
+        document.getElementById('vote-ctrl').className = "hidden";
+        render(d.images, isD);
     });
 
     socket.on('showClue', d => {
+        document.getElementById('lobby-screen').classList.add('hidden');
+        document.getElementById('game-screen').classList.remove('hidden');
         document.getElementById('clue-display').innerText = `CLUE: ${d.clue}`;
         if(myId !== d.drawerId) { document.getElementById('fake-ctrl').classList.remove('hidden'); render(d.pImages, true); }
+        else { document.getElementById('grid').innerHTML = "<p style='text-align:center; opacity:0.5;'>Players are picking baits...</p>"; }
     });
 
     socket.on('startVoting', d => {
+        document.getElementById('lobby-screen').classList.add('hidden');
+        document.getElementById('game-screen').classList.remove('hidden');
         document.getElementById('fake-ctrl').classList.add('hidden');
         document.getElementById('clue-display').innerText = "VOTE!";
         if(myId !== d.drawerId) document.getElementById('vote-ctrl').classList.remove('hidden');
@@ -227,6 +238,7 @@
 
     function render(imgs, canS) {
         const g = document.getElementById('grid'); g.innerHTML = "";
+        if(!imgs || imgs.length === 0 && !canS) return g.innerHTML = "<p style='text-align:center; opacity:0.5;'>Waiting for turn...</p>";
         imgs.forEach((url, i) => {
             const c = document.createElement('div'); c.className = 'image-card';
             c.innerHTML = `<img src="${url}">`;
@@ -258,6 +270,7 @@
     });
 
     socket.on('timerUpdate', t => { const e = document.getElementById('timer'); e.innerText = t; e.classList.toggle('low-time', t <= 10); });
+    socket.on('gameOver', d => { toggleModal('leaderboard-overlay'); document.getElementById('final-list').innerHTML = d.leaderboard.map(p => `<div>${p.name}: ${p.score}</div>`).join(''); });
 </script>
 </body>
 </html>
