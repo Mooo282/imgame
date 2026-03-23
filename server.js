@@ -23,10 +23,10 @@ const imagePools = {
     "fun": Array.from({length: 50}, (_, i) => `/images/fun/${i+1}.jpg`)
 };
 
-// هيكل بيانات الغرف (كل غرفة هي كائن مستقل)
+// هيكل بيانات الغرف
 const gameRooms = {};
 
-// دالة خلط المصفوفات
+// وظيفة خلط المصفوفات
 function shuffle(array) {
     let a = [...array];
     for (let i = a.length - 1; i > 0; i--) {
@@ -36,15 +36,27 @@ function shuffle(array) {
     return a;
 }
 
-// دالة إنشاء بيانات الغرفة الجديدة
+// إنشاء بيانات الغرفة
 function initRoom(roomId) {
     if (!gameRooms[roomId]) {
         gameRooms[roomId] = {
-            players: [], scores: {}, playerNames: {}, hostId: null,
-            playerReady: {}, targetPoints: 30, roundTimeLimit: 60,
-            currentDrawerId: null, currentPool: [], gameState: "LOBBY",
-            currentImages: [], currentClue: "", correctImage: "",
-            fakeImages: {}, votes: {}, drawerQueue: [], gameTimer: null
+            players: [],
+            scores: {},
+            playerNames: {},
+            hostId: null,
+            playerReady: {},
+            targetPoints: 30,
+            roundTimeLimit: 60,
+            currentDrawerId: null,
+            currentPool: [],
+            gameState: "LOBBY",
+            currentImages: [],
+            currentClue: "",
+            correctImage: "",
+            fakeImages: {},
+            votes: {},
+            drawerQueue: [],
+            gameTimer: null
         };
     }
     return gameRooms[roomId];
@@ -54,8 +66,12 @@ function emitPlayerList(roomId) {
     const r = gameRooms[roomId];
     if (r) {
         io.to(roomId).emit('updatePlayerList', { 
-            players: r.players, playerNames: r.playerNames, hostId: r.hostId, 
-            scores: r.scores, gameState: r.gameState, currentDrawerId: r.currentDrawerId, 
+            players: r.players, 
+            playerNames: r.playerNames, 
+            hostId: r.hostId, 
+            scores: r.scores, 
+            gameState: r.gameState, 
+            currentDrawerId: r.currentDrawerId, 
             playerReady: r.playerReady 
         });
     }
@@ -92,27 +108,12 @@ io.on('connection', (socket) => {
         if (r.playerReady[uId] === undefined) r.playerReady[uId] = false;
         if (!r.players.includes(uId)) r.players.push(uId);
         
-        // تعيين الهوست للغرفة
         if (!r.hostId || !r.players.includes(r.hostId)) r.hostId = r.players[0];
 
         socket.emit('initRoom', roomId);
-
-        // مزامنة حالة اللعبة للاعب المنضم (Hot-Join Sync)
-        if (r.gameState !== "LOBBY") {
-            if (r.gameState === "DRAWING") {
-                socket.emit('roundStarted', { 
-                    images: (uId === r.currentDrawerId ? r.currentImages : []), 
-                    drawerId: r.currentDrawerId, 
-                    drawerName: r.playerNames[r.currentDrawerId] 
-                });
-            } else if (r.gameState === "FAKING") {
-                socket.emit('showClue', { clue: r.currentClue, pImages: (uId !== r.currentDrawerId ? shuffle(r.currentPool).filter(img => img !== r.correctImage).slice(0, 6) : []) });
-            }
-        }
         emitPlayerList(roomId);
     });
 
-    // مؤشر الكتابة (Typing Indicator) لكل غرفة
     socket.on('typing', (isTyping) => {
         if (socket.roomId) {
             socket.broadcast.to(socket.roomId).emit('playerTyping', { userId: socket.userId, isTyping });
@@ -130,8 +131,8 @@ io.on('connection', (socket) => {
     socket.on('requestStart', (data) => {
         const r = gameRooms[socket.roomId];
         if (r && socket.userId === r.hostId && r.gameState === "LOBBY") {
-            r.targetPoints = parseInt(data.targetPoints);
-            r.roundTimeLimit = parseInt(data.roundTime);
+            r.targetPoints = parseInt(data.targetPoints) || 30;
+            r.roundTimeLimit = parseInt(data.roundTime) || 60;
             r.currentPool = imagePools[data.mode] || imagePools["classic"];
             startNewRound(socket.roomId);
         }
@@ -139,33 +140,169 @@ io.on('connection', (socket) => {
 
     function startNewRound(roomId) {
         const r = gameRooms[roomId];
-        r.gameState = "DRAWING"; r.fakeImages = {}; r.votes = {}; r.currentClue = "";
+        r.gameState = "DRAWING"; 
+        r.fakeImages = {}; 
+        r.votes = {}; 
+        r.currentClue = "";
+        
         if (r.drawerQueue.length === 0) r.drawerQueue = shuffle(r.players);
         r.currentDrawerId = r.drawerQueue.shift();
         r.currentImages = shuffle(r.currentPool).slice(0, 6);
 
-        io.to(roomId).emit('roundStarted', { images: [], drawerId: r.currentDrawerId, drawerName: r.playerNames[r.currentDrawerId] });
+        io.to(roomId).emit('roundStarted', { 
+            images: [], 
+            drawerId: r.currentDrawerId, 
+            drawerName: r.playerNames[r.currentDrawerId] 
+        });
         
-        // إرسال الصور للرسام فقط
-        io.to(roomId).fetchSockets().then(sockets => {
+        io.in(roomId).fetchSockets().then(sockets => {
             const drawerSocket = sockets.find(s => s.userId === r.currentDrawerId);
-            if (drawerSocket) drawerSocket.emit('roundStarted', { images: r.currentImages, drawerId: r.currentDrawerId, drawerName: r.playerNames[r.currentDrawerId] });
+            if (drawerSocket) {
+                drawerSocket.emit('roundStarted', { 
+                    images: r.currentImages, 
+                    drawerId: r.currentDrawerId, 
+                    drawerName: r.playerNames[r.currentDrawerId] 
+                });
+            }
         });
 
-        startTimer(roomId, r.roundTimeLimit, () => { if(r.gameState === "DRAWING") startNewRound(roomId); });
+        startTimer(roomId, r.roundTimeLimit, () => { 
+            if(r.gameState === "DRAWING") startNewRound(roomId); 
+        });
     }
 
     socket.on('submitClue', (data) => {
         const r = gameRooms[socket.roomId];
         if (!r || socket.userId !== r.currentDrawerId) return;
-        r.gameState = "FAKING"; r.correctImage = data.image; r.currentClue = data.clue;
-        io.to(socket.roomId).emit('showClue', { clue: r.currentClue, pImages: [] });
-        startTimer(socket.roomId, r.roundTimeLimit, () => finalizeRound(socket.roomId));
+        
+        r.gameState = "FAKING"; 
+        r.correctImage = data.image; 
+        r.currentClue = data.clue;
+
+        r.players.forEach(pId => {
+            if (pId !== r.currentDrawerId) {
+                const pImages = shuffle(r.currentPool).filter(img => img !== r.correctImage).slice(0, 6);
+                io.in(socket.roomId).fetchSockets().then(sockets => {
+                    const s = sockets.find(x => x.userId === pId);
+                    if(s) s.emit('showClue', { clue: r.currentClue, pImages: pImages });
+                });
+            } else {
+                io.in(socket.roomId).fetchSockets().then(sockets => {
+                    const s = sockets.find(x => x.userId === pId);
+                    if(s) s.emit('showClue', { clue: r.currentClue, pImages: [] });
+                });
+            }
+        });
+
+        startTimer(socket.roomId, r.roundTimeLimit, () => proceedToVoting(socket.roomId));
     });
+
+    socket.on('submitFake', (img) => {
+        const r = gameRooms[socket.roomId];
+        if (r && socket.userId !== r.currentDrawerId) {
+            r.fakeImages[socket.userId] = img;
+        }
+        if (r && Object.keys(r.fakeImages).length >= (r.players.length - 1)) {
+            proceedToVoting(socket.roomId);
+        }
+    });
+
+    function proceedToVoting(roomId) {
+        const r = gameRooms[roomId];
+        r.gameState = "VOTING";
+        
+        let opts = shuffle([...new Set([r.correctImage, ...Object.values(r.fakeImages)])]);
+        while(opts.length < Math.min(6, r.currentPool.length)) {
+            let rand = r.currentPool[Math.floor(Math.random() * r.currentPool.length)];
+            if(!opts.includes(rand)) opts.push(rand);
+        }
+        
+        io.to(roomId).emit('startVoting', { 
+            options: shuffle(opts), 
+            drawerId: r.currentDrawerId 
+        });
+        
+        startTimer(roomId, r.roundTimeLimit, () => finalizeRound(roomId));
+    }
+
+    socket.on('submitVote', (img) => {
+        const r = gameRooms[socket.roomId];
+        if (r && socket.userId !== r.currentDrawerId) {
+            r.votes[socket.userId] = img;
+        }
+        if (r && Object.keys(r.votes).length >= (r.players.length - 1)) {
+            finalizeRound(socket.roomId);
+        }
+    });
+
+    function finalizeRound(roomId) {
+        const r = gameRooms[roomId];
+        if (r.gameTimer) clearInterval(r.gameTimer);
+        r.gameState = "RESULTS";
+        
+        let total = r.players.length - 1;
+        let correct = 0;
+        for (let vId in r.votes) {
+            if (r.votes[vId] === r.correctImage) correct++;
+        }
+        
+        // نظام النقاط (Dixit Style)
+        if (correct > 0 && correct < total) {
+            r.scores[r.currentDrawerId] += (correct * 2);
+            for (let vId in r.votes) {
+                if (r.votes[vId] === r.correctImage) r.scores[vId] += 2;
+            }
+        } else if (correct === total || correct === 0) {
+            for (let vId in r.votes) {
+                if (r.votes[vId] === r.correctImage) r.scores[vId] += 2;
+            }
+        }
+
+        for (let vId in r.votes) {
+            for (let fId in r.fakeImages) {
+                if (r.votes[vId] === r.fakeImages[fId] && fId !== vId) {
+                    r.scores[fId] += 1;
+                }
+            }
+        }
+
+        let voteDetails = {};
+        let fakers = {};
+        for (let vId in r.votes) { 
+            if (!voteDetails[r.votes[vId]]) voteDetails[r.votes[vId]] = []; 
+            voteDetails[r.votes[vId]].push(r.playerNames[vId]); 
+        }
+        for (let fId in r.fakeImages) {
+            fakers[r.fakeImages[fId]] = r.playerNames[fId];
+        }
+
+        io.to(roomId).emit('roundFinished', { 
+            correctImage: r.correctImage, 
+            scores: r.scores, 
+            voteDetails, 
+            fakers 
+        });
+
+        setTimeout(() => {
+            if (r.players.some(id => r.scores[id] >= r.targetPoints)) {
+                const lb = r.players.map(id => ({ 
+                    name: r.playerNames[id], 
+                    score: r.scores[id] 
+                })).sort((a,b) => b.score - a.score);
+                io.to(roomId).emit('gameOver', { leaderboard: lb });
+                r.gameState = "LOBBY";
+            } else if(r.players.length > 0) {
+                startNewRound(roomId);
+            }
+        }, 8000);
+    }
 
     socket.on('sendChat', (msg) => {
         if (socket.roomId) {
-            io.to(socket.roomId).emit('newChat', { sender: gameRooms[socket.roomId].playerNames[socket.userId], text: msg });
+            io.to(socket.roomId).emit('newChat', { 
+                sender: gameRooms[socket.roomId].playerNames[socket.userId], 
+                text: msg 
+            });
         }
     });
 
@@ -173,17 +310,14 @@ io.on('connection', (socket) => {
         const rid = socket.roomId;
         const uid = socket.userId;
         if (rid && gameRooms[rid]) {
-            const r = gameRooms[rid];
-            // مهلة 5 ثوانٍ قبل حذف اللاعب لضمان إمكانية العودة (Reconnection)
             setTimeout(() => {
-                io.to(rid).fetchSockets().then(sockets => {
-                    const isStillThere = sockets.some(s => s.userId === uid);
-                    if (!isStillThere) {
+                io.in(rid).fetchSockets().then(sockets => {
+                    if (!sockets.some(s => s.userId === uid)) {
+                        const r = gameRooms[rid];
                         r.players = r.players.filter(id => id !== uid);
                         if (r.players.length === 0) {
                             if(r.gameTimer) clearInterval(r.gameTimer);
                             delete gameRooms[rid];
-                            console.log(`Room ${rid} closed.`);
                         } else {
                             if (uid === r.hostId) r.hostId = r.players[0];
                             emitPlayerList(rid);
@@ -196,5 +330,5 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, () => {
-    console.log(`PixDeception Multi-Room Server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
