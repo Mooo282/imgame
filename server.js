@@ -56,7 +56,15 @@ io.on('connection', (socket) => {
 
     function emitPlayerList(rId) {
         const room = rooms[rId];
-        if (room) io.to(rId).emit('updatePlayerList', { players: room.players, playerNames: room.playerNames, hostId: room.hostId, scores: room.scores, gameState: room.gameState, playerReady: room.playerReady, roomId: rId });
+        if (room) io.to(rId).emit('updatePlayerList', { 
+            players: room.players, 
+            playerNames: room.playerNames, 
+            hostId: room.hostId, 
+            scores: room.scores, 
+            gameState: room.gameState, 
+            playerReady: room.playerReady, 
+            roomId: rId 
+        });
     }
 
     socket.on('toggleReady', () => {
@@ -88,6 +96,7 @@ io.on('connection', (socket) => {
 
     socket.on('submitClue', (data) => {
         const room = rooms[socket.roomId];
+        if (!room) return;
         room.gameState = "FAKING"; room.correctImage = data.image; room.currentClue = data.clue;
         io.to(socket.roomId).emit('showClue', { 
             clue: room.currentClue, 
@@ -99,6 +108,7 @@ io.on('connection', (socket) => {
 
     socket.on('submitFake', (img) => {
         const room = rooms[socket.roomId];
+        if (!room) return;
         room.fakeImages[socket.userId] = img;
         if (Object.keys(room.fakeImages).length >= (room.players.length - 1)) proceedToVoting(socket.roomId);
     });
@@ -108,7 +118,7 @@ io.on('connection', (socket) => {
         if (!room || room.gameState !== "FAKING") return;
         room.gameState = "VOTING";
 
-        // منطق الـ 6 صور على الأقل
+        // منطق الـ 6 صور على الأقل دائماً
         let opts = [...new Set([room.correctImage, ...Object.values(room.fakeImages)])];
         while (opts.length < 6 && opts.length < room.currentPool.length) {
             let rand = room.currentPool[Math.floor(Math.random() * room.currentPool.length)];
@@ -122,6 +132,7 @@ io.on('connection', (socket) => {
 
     socket.on('submitVote', (img) => {
         const room = rooms[socket.roomId];
+        if (!room) return;
         room.votes[socket.userId] = img;
         if (Object.keys(room.votes).length >= (room.players.length - 1)) finalizeRound(socket.roomId);
     });
@@ -143,7 +154,6 @@ io.on('connection', (socket) => {
             for (let vId in room.votes) if (room.votes[vId] === room.correctImage) room.scores[vId] += 2;
         }
 
-        // نقاط التضليل
         for (let vId in room.votes) {
             for (let fId in room.fakeImages) {
                 if (room.votes[vId] === room.fakeImages[fId] && vId !== fId) room.scores[fId] += 1;
@@ -161,12 +171,14 @@ io.on('connection', (socket) => {
         io.to(rId).emit('roundFinished', { correctImage: room.correctImage, scores: room.scores, voteDetails, fakers });
         
         setTimeout(() => {
-            const winner = room.players.find(id => room.scores[id] >= room.targetPoints);
-            if (winner) {
-                const lb = room.players.map(id => ({ name: room.playerNames[id], score: room.scores[id] })).sort((a,b) => b.score - a.score);
-                io.to(rId).emit('gameOver', { leaderboard: lb });
-                delete rooms[rId];
-            } else { startNewRound(rId); }
+            if (rooms[rId]) {
+                const winner = rooms[rId].players.find(id => rooms[rId].scores[id] >= rooms[rId].targetPoints);
+                if (winner) {
+                    const lb = rooms[rId].players.map(id => ({ name: rooms[rId].playerNames[id], score: rooms[rId].scores[id] })).sort((a,b) => b.score - a.score);
+                    io.to(rId).emit('gameOver', { leaderboard: lb });
+                    delete rooms[rId];
+                } else { startNewRound(rId); }
+            }
         }, 8000);
     }
 
@@ -176,7 +188,7 @@ io.on('connection', (socket) => {
         let t = dur;
         room.gameTimer = setInterval(() => {
             t--; io.to(rId).emit('timerUpdate', t);
-            if (t <= 0) { clearInterval(room.gameTimer); cb(); }
+            if (t <= 0) { clearInterval(room.gameTimer); if(cb) cb(); }
         }, 1000);
     }
 
@@ -192,7 +204,10 @@ io.on('connection', (socket) => {
             if (rooms[rId].players.length === 0) {
                 clearInterval(rooms[rId].gameTimer);
                 delete rooms[rId];
-            } else { emitPlayerList(rId); }
+            } else { 
+                if (socket.userId === rooms[rId].hostId) rooms[rId].hostId = rooms[rId].players[0];
+                emitPlayerList(rId); 
+            }
         }
     });
 });
