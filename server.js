@@ -30,11 +30,9 @@ io.on('connection', (socket) => {
     socket.on('joinGame', (data) => {
         const { roomId, userId, name, isJoining } = data;
         if (isJoining && !rooms[roomId]) return socket.emit('errorMsg', "Room not found!");
-
         socket.join(roomId);
         socket.roomId = roomId;
         socket.userId = userId;
-
         if (!rooms[roomId]) {
             rooms[roomId] = {
                 players: [], scores: {}, playerNames: {}, hostId: userId,
@@ -43,30 +41,17 @@ io.on('connection', (socket) => {
                 currentClue: "", correctImage: "", gameTimer: null, targetPoints: 30, roundTimeLimit: 60
             };
         }
-
         const room = rooms[roomId];
         room.playerNames[userId] = name;
         if (!room.players.includes(userId)) room.players.push(userId);
         if (room.scores[userId] === undefined) room.scores[userId] = 0;
-        
         emitPlayerList(roomId);
-        
-        // إعادة اللاعب لحالته إذا عمل ريفريش
-        if(room.gameState !== "LOBBY") {
-            socket.emit('newChat', { sender: "System", text: "Welcome back!" });
-            // هنا يمكنك إضافة منطق لإرسال الحالة الحالية للعبة للاعب العائد
-        }
     });
 
     function emitPlayerList(rId) {
         const room = rooms[rId];
         if (room) io.to(rId).emit('updatePlayerList', { players: room.players, playerNames: room.playerNames, hostId: room.hostId, scores: room.scores, gameState: room.gameState, playerReady: room.playerReady, roomId: rId });
     }
-
-    socket.on('toggleReady', () => {
-        const room = rooms[socket.roomId];
-        if (room) { room.playerReady[socket.userId] = !room.playerReady[socket.userId]; emitPlayerList(socket.roomId); }
-    });
 
     socket.on('requestStart', (data) => {
         const room = rooms[socket.roomId];
@@ -84,15 +69,31 @@ io.on('connection', (socket) => {
         room.gameState = "DRAWING"; room.fakeImages = {}; room.votes = {};
         if (room.drawerQueue.length === 0) room.drawerQueue = shuffle(room.players);
         room.currentDrawerId = room.drawerQueue.shift();
+        
         const roundImages = shuffle(room.currentPool).slice(0, 6);
-        io.to(rId).emit('roundStarted', { images: roundImages, drawerId: room.currentDrawerId, drawerName: room.playerNames[room.currentDrawerId] });
+
+        // تعديل: إرسال الصور للرسام فقط، والآخرون يرون قائمة فارغة
+        room.players.forEach(pId => {
+            const sid = Array.from(io.sockets.adapter.rooms.get(rId) || []).find(s => io.sockets.sockets.get(s).userId === pId);
+            if (sid) {
+                const imgs = (pId === room.currentDrawerId) ? roundImages : [];
+                io.to(sid).emit('roundStarted', { images: imgs, drawerId: room.currentDrawerId, drawerName: room.playerNames[room.currentDrawerId] });
+            }
+        });
         startTimer(rId, room.roundTimeLimit, () => { if(room.gameState === "DRAWING") startNewRound(rId); });
     }
 
     socket.on('submitClue', (data) => {
         const room = rooms[socket.roomId];
         room.gameState = "FAKING"; room.correctImage = data.image; room.currentClue = data.clue;
-        io.to(socket.roomId).emit('showClue', { clue: room.currentClue, pImages: shuffle(room.currentPool).filter(img => img !== room.correctImage).slice(0, 6), drawerId: room.currentDrawerId });
+        
+        room.players.forEach(pId => {
+            const sid = Array.from(io.sockets.adapter.rooms.get(socket.roomId) || []).find(s => io.sockets.sockets.get(s).userId === pId);
+            if (sid) {
+                const fImages = (pId !== room.currentDrawerId) ? shuffle(room.currentPool).filter(img => img !== room.correctImage).slice(0, 6) : [];
+                io.to(sid).emit('showClue', { clue: room.currentClue, pImages: fImages, drawerId: room.currentDrawerId });
+            }
+        });
         startTimer(socket.roomId, room.roundTimeLimit, () => proceedToVoting(socket.roomId));
     });
 
@@ -104,10 +105,10 @@ io.on('connection', (socket) => {
 
     function proceedToVoting(rId) {
         const room = rooms[rId];
-        if (!room || room.gameState !== "FAKING") return;
+        if (room.gameState !== "FAKING") return;
         room.gameState = "VOTING";
         let opts = [...new Set([room.correctImage, ...Object.values(room.fakeImages)])];
-        while (opts.length < 6 && opts.length < room.currentPool.length) {
+        while (opts.length < 6) {
             let rand = room.currentPool[Math.floor(Math.random() * room.currentPool.length)];
             if (!opts.includes(rand)) opts.push(rand);
         }
@@ -117,6 +118,7 @@ io.on('connection', (socket) => {
 
     socket.on('submitVote', (img) => {
         const room = rooms[socket.roomId];
+        if (img === room.fakeImages[socket.userId]) return; // حماية إضافية من السيرفر
         room.votes[socket.userId] = img;
         if (Object.keys(room.votes).length >= (room.players.length - 1)) finalizeRound(socket.roomId);
     });
@@ -126,25 +128,19 @@ io.on('connection', (socket) => {
         if (!room || room.gameState !== "VOTING") return;
         clearInterval(room.gameTimer);
         room.gameState = "RESULTS";
-
-        let correctCount = 0, totalVoters = room.players.length - 1;
-        for (let vId in room.votes) if (room.votes[vId] === room.correctImage) correctCount++;
+        let correct = 0, total = room.players.length - 1;
+        for (let vId in room.votes) if (room.votes[vId] === room.correctImage) correct++;
         
-        // 1. حساب نقاط الرسام (Drawer)
-        if (correctCount > 0 && correctCount < totalVoters) {
-            room.scores[room.currentDrawerId] += 3; // الرسام يأخذ نقاط إذا البعض عرف الصورة
-            for (let vId in room.votes) if (room.votes[vId] === room.correctImage) room.scores[vId] += 3; // المصوت الصحيح
+        if (correct > 0 && correct < total) {
+            room.scores[room.currentDrawerId] += 3;
+            for (let vId in room.votes) if (room.votes[vId] === room.correctImage) room.scores[vId] += 3;
         } else {
-            // إذا الكل عرف أو محد عرف، الرسام ما ياخذ شي، والكل ياخذ 2
             for (let vId in room.votes) if (room.votes[vId] === room.correctImage) room.scores[vId] += 2;
         }
 
-        // 2. حساب نقاط التضليل (Bonus for Fakers)
         for (let vId in room.votes) {
             for (let fId in room.fakeImages) {
-                if (room.votes[vId] === room.fakeImages[fId] && vId !== fId) {
-                    room.scores[fId] += 1; // نقطة عن كل شخص تضلل بصورتك
-                }
+                if (room.votes[vId] === room.fakeImages[fId] && vId !== fId) room.scores[fId] += 1;
             }
         }
 
@@ -185,17 +181,11 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         const rId = socket.roomId;
         if (rooms[rId]) {
-            setTimeout(() => {
-                if (!rooms[rId]) return;
-                const isStillGone = !Array.from(io.sockets.adapter.rooms.get(rId) || []).some(s => io.sockets.sockets.get(s).userId === socket.userId);
-                if(isStillGone) {
-                    rooms[rId].players = rooms[rId].players.filter(id => id !== socket.userId);
-                    if (rooms[rId].players.length === 0) delete rooms[rId];
-                    else emitPlayerList(rId);
-                }
-            }, 3000); // مهلة 3 ثواني للريفريش
+            rooms[rId].players = rooms[rId].players.filter(id => id !== socket.userId);
+            if (rooms[rId].players.length === 0) delete rooms[rId];
+            else emitPlayerList(rId);
         }
     });
 });
 
-server.listen(PORT, () => console.log(`PixDeception Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server running on ${PORT}`));
