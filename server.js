@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname)));
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
-// خزان الصور - تأكد من وجود المجلدات والصور
+// Image Pools Configuration
 const imagePools = {
     "classic": Array.from({length: 50}, (_, i) => `/images/classic/${i+1}.jpg`),
     "fun": Array.from({length: 50}, (_, i) => `/images/fun/${i+1}.jpg`)
@@ -34,7 +34,7 @@ io.on('connection', (socket) => {
         const { roomId, userId, name, isJoining } = data;
         
         if (isJoining && !rooms[roomId]) {
-            return socket.emit('errorMsg', "الغرفة غير موجودة!");
+            return socket.emit('errorMsg', "Room not found or session expired!");
         }
 
         socket.join(roomId);
@@ -59,7 +59,7 @@ io.on('connection', (socket) => {
         
         emitPlayerList(roomId);
 
-        // منطق الدخول المباشر (Hot-Join) واستعادة الحالة عند الـ Refresh
+        // Hot-Join / Refresh Recovery Logic
         if (room.gameState !== "LOBBY") {
             if (room.gameState === "DRAWING") {
                 const imgs = (userId === room.currentDrawerId) ? room.lastDrawerImages : [];
@@ -152,7 +152,6 @@ io.on('connection', (socket) => {
         room.gameState = "VOTING";
         let opts = [...new Set([room.correctImage, ...Object.values(room.fakeImages)])];
         
-        // ضمان وجود 6 خيارات دائماً
         while (opts.length < 6 && opts.length < room.currentPool.length) {
             let rand = room.currentPool[Math.floor(Math.random() * room.currentPool.length)];
             if (!opts.includes(rand)) opts.push(rand);
@@ -185,20 +184,17 @@ io.on('connection', (socket) => {
             if (room.votes[vId] === room.correctImage) correctCount++;
         }
         
-        // توزيع النقاط
         if (correctCount > 0 && correctCount < totalVoters) {
-            room.scores[room.currentDrawerId] += 3; // الرسام ينجح في التلميح لبعض الأشخاص
+            room.scores[room.currentDrawerId] += 3;
             for (let vId in room.votes) {
                 if (room.votes[vId] === room.correctImage) room.scores[vId] += 3;
             }
         } else {
-            // إذا الكل عرف أو محد عرف، الكل (المصوتين) يأخذ 2 والرسام 0
             for (let vId in room.votes) {
                 if (room.votes[vId] === room.correctImage) room.scores[vId] += 2;
             }
         }
 
-        // نقاط التضليل للمخادعين
         for (let vId in room.votes) {
             for (let fId in room.fakeImages) {
                 if (room.votes[vId] === room.fakeImages[fId] && vId !== fId) {
@@ -273,7 +269,6 @@ io.on('connection', (socket) => {
         const rId = socket.roomId;
         const uId = socket.userId;
         if (rooms[rId]) {
-            // مهلة بسيطة للتعامل مع الريفرش
             setTimeout(() => {
                 if (!rooms[rId]) return;
                 const isStillGone = !Array.from(io.sockets.adapter.rooms.get(rId) || [])
