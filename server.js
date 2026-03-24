@@ -30,9 +30,11 @@ io.on('connection', (socket) => {
     socket.on('joinGame', (data) => {
         const { roomId, userId, name, isJoining } = data;
         if (isJoining && !rooms[roomId]) return socket.emit('errorMsg', "Room not found!");
+        
         socket.join(roomId);
         socket.roomId = roomId;
         socket.userId = userId;
+
         if (!rooms[roomId]) {
             rooms[roomId] = {
                 players: [], scores: {}, playerNames: {}, hostId: userId,
@@ -41,16 +43,22 @@ io.on('connection', (socket) => {
                 currentClue: "", correctImage: "", gameTimer: null, targetPoints: 30, roundTimeLimit: 60
             };
         }
+
         const room = rooms[roomId];
         room.playerNames[userId] = name;
         if (!room.players.includes(userId)) room.players.push(userId);
         if (room.scores[userId] === undefined) room.scores[userId] = 0;
+        
         emitPlayerList(roomId);
     });
 
     function emitPlayerList(rId) {
         const room = rooms[rId];
-        if (room) io.to(rId).emit('updatePlayerList', { players: room.players, playerNames: room.playerNames, hostId: room.hostId, scores: room.scores, gameState: room.gameState, playerReady: room.playerReady, roomId: rId });
+        if (room) io.to(rId).emit('updatePlayerList', { 
+            players: room.players, playerNames: room.playerNames, 
+            hostId: room.hostId, scores: room.scores, 
+            gameState: room.gameState, playerReady: room.playerReady, roomId: rId 
+        });
     }
 
     socket.on('requestStart', (data) => {
@@ -71,8 +79,6 @@ io.on('connection', (socket) => {
         room.currentDrawerId = room.drawerQueue.shift();
         
         const roundImages = shuffle(room.currentPool).slice(0, 6);
-
-        // تعديل: إرسال الصور للرسام فقط، والآخرون يرون قائمة فارغة
         room.players.forEach(pId => {
             const sid = Array.from(io.sockets.adapter.rooms.get(rId) || []).find(s => io.sockets.sockets.get(s).userId === pId);
             if (sid) {
@@ -86,7 +92,6 @@ io.on('connection', (socket) => {
     socket.on('submitClue', (data) => {
         const room = rooms[socket.roomId];
         room.gameState = "FAKING"; room.correctImage = data.image; room.currentClue = data.clue;
-        
         room.players.forEach(pId => {
             const sid = Array.from(io.sockets.adapter.rooms.get(socket.roomId) || []).find(s => io.sockets.sockets.get(s).userId === pId);
             if (sid) {
@@ -105,7 +110,7 @@ io.on('connection', (socket) => {
 
     function proceedToVoting(rId) {
         const room = rooms[rId];
-        if (room.gameState !== "FAKING") return;
+        if (!room || room.gameState !== "FAKING") return;
         room.gameState = "VOTING";
         let opts = [...new Set([room.correctImage, ...Object.values(room.fakeImages)])];
         while (opts.length < 6) {
@@ -118,7 +123,7 @@ io.on('connection', (socket) => {
 
     socket.on('submitVote', (img) => {
         const room = rooms[socket.roomId];
-        if (img === room.fakeImages[socket.userId]) return; // حماية إضافية من السيرفر
+        if (img === room.fakeImages[socket.userId]) return;
         room.votes[socket.userId] = img;
         if (Object.keys(room.votes).length >= (room.players.length - 1)) finalizeRound(socket.roomId);
     });
@@ -128,9 +133,11 @@ io.on('connection', (socket) => {
         if (!room || room.gameState !== "VOTING") return;
         clearInterval(room.gameTimer);
         room.gameState = "RESULTS";
+        
         let correct = 0, total = room.players.length - 1;
         for (let vId in room.votes) if (room.votes[vId] === room.correctImage) correct++;
         
+        // حساب النقاط
         if (correct > 0 && correct < total) {
             room.scores[room.currentDrawerId] += 3;
             for (let vId in room.votes) if (room.votes[vId] === room.correctImage) room.scores[vId] += 3;
@@ -176,7 +183,10 @@ io.on('connection', (socket) => {
         }, 1000);
     }
 
-    socket.on('sendChat', m => io.to(socket.roomId).emit('newChat', { sender: rooms[socket.roomId].playerNames[socket.userId], text: m }));
+    socket.on('sendChat', m => {
+        const room = rooms[socket.roomId];
+        if(room) io.to(socket.roomId).emit('newChat', { sender: room.playerNames[socket.userId], text: m });
+    });
 
     socket.on('disconnect', () => {
         const rId = socket.roomId;
@@ -188,4 +198,4 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(PORT, () => console.log(`Server running on ${PORT}`));
+server.listen(PORT, () => console.log(`PixDeception Server online on ${PORT}`));

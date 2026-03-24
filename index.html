@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PixDeception | Balanced Edition</title>
+    <title>PixDeception | Final Fix</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         :root { --bg: #0f0c29; --card-bg: rgba(255, 255, 255, 0.07); --primary: #a78bfa; --secondary: #f472b6; --glass: rgba(255, 255, 255, 0.15); --success: #34d399; }
@@ -38,7 +38,8 @@
 </head>
 <body>
 
-<div id="name-screen" class="modal">
+<!-- شاشة الاسم - تظهر دائما في البداية -->
+<div id="name-screen" class="modal" style="display: flex;">
     <div class="modal-content" style="text-align:center;">
         <h1 style="color:var(--primary);">PixDeception</h1>
         <input type="text" id="nick" class="modern-input" placeholder="Nickname...">
@@ -65,7 +66,7 @@
         <div id="lobby-screen">
             <div id="host-controls" class="hidden">
                 <h3 style="text-align:center;">Host Settings</h3>
-                <select id="game-mode" class="modern-input"><option value="classic">Classic</option><option value="fun">Fun</option></select>
+                <select id="game-mode" class="modern-input"><option value="classic">Classic Mode</option><option value="fun">Fun Mode</option></select>
                 <select id="win-points" class="modern-input"><option value="15">15 pts</option><option value="30" selected>30 pts</option></select>
                 <select id="round-timer" class="modern-input"><option value="30">30s</option><option value="60" selected>60s</option></select>
                 <button onclick="startGame()" class="btn-glow">Start Match</button>
@@ -114,9 +115,12 @@
     let selectedImg = null, isChatOpen = false, myBait = null;
 
     window.onload = () => {
-        const sN = localStorage.getItem('pix_name'), sR = localStorage.getItem('pix_room');
-        if (sN && sR) socket.emit('joinGame', { roomId: sR, userId: myId, name: sN, isJoining: true });
-        else document.getElementById('name-screen').style.display = 'flex';
+        // تعبئة البيانات القديمة في الخانات فقط دون دخول تلقائي
+        const sN = localStorage.getItem('pix_name');
+        const sR = localStorage.getItem('pix_room');
+        if (sN) document.getElementById('nick').value = sN;
+        if (sR) document.getElementById('room-input').value = sR;
+        document.getElementById('name-screen').style.display = 'flex';
     };
 
     function switchTab(isC) {
@@ -129,8 +133,11 @@
     function processEntry(isN) {
         const n = document.getElementById('nick').value.trim();
         const r = isN ? Math.random().toString(36).substring(2, 6).toUpperCase() : document.getElementById('room-input').value.trim().toUpperCase();
-        if(!n || !r) return alert("Info required!");
-        localStorage.setItem('pix_name', n); localStorage.setItem('pix_room', r);
+        if(!n || !r) return alert("Nickname and Room Code required!");
+        
+        localStorage.setItem('pix_name', n); 
+        localStorage.setItem('pix_room', r);
+        
         socket.emit('joinGame', { roomId: r, userId: myId, name: n, isJoining: !isN });
         document.getElementById('name-screen').style.display = 'none';
     }
@@ -147,7 +154,16 @@
         document.getElementById('room-id-left').innerText = "Room: " + d.roomId;
         const lLeft = document.getElementById('player-list-left'), lMob = document.getElementById('player-list-mob');
         lLeft.innerHTML = lMob.innerHTML = "";
-        if (myId === d.hostId && d.gameState === "LOBBY") document.getElementById('host-controls').classList.remove('hidden');
+        
+        // إظهار لوحة التحكم للمضيف فقط في الـ Lobby
+        if (myId === d.hostId && d.gameState === "LOBBY") {
+            document.getElementById('host-controls').classList.remove('hidden');
+            document.getElementById('wait-msg').classList.add('hidden');
+        } else if (d.gameState === "LOBBY") {
+            document.getElementById('host-controls').classList.add('hidden');
+            document.getElementById('wait-msg').classList.remove('hidden');
+        }
+
         d.players.forEach(id => {
             const h = `<div class="player-card"><span>${d.playerReady[id]?'✅':'⏳'} ${d.playerNames[id]}</span><b>${d.scores[id]||0}</b></div>`;
             lLeft.innerHTML += h; lMob.innerHTML += h;
@@ -159,7 +175,7 @@
         document.getElementById('lobby-screen').classList.add('hidden');
         document.getElementById('game-screen').classList.remove('hidden');
         const isD = (myId === d.drawerId);
-        document.getElementById('clue-display').innerText = isD ? "PICK IMAGE & CLUE" : `WAIT FOR ${d.drawerName}...`;
+        document.getElementById('clue-display').innerText = isD ? "PICK IMAGE & WRITE CLUE" : `WAIT FOR ${d.drawerName}...`;
         document.getElementById('draw-ctrl').className = isD ? "" : "hidden";
         render(d.images, isD);
     });
@@ -167,12 +183,12 @@
     socket.on('showClue', d => {
         document.getElementById('clue-display').innerText = `CLUE: ${d.clue}`;
         if(myId !== d.drawerId) { document.getElementById('fake-ctrl').classList.remove('hidden'); render(d.pImages, true); }
-        else { document.getElementById('grid').innerHTML = "<p style='text-align:center; opacity:0.5;'>Players are picking baits...</p>"; }
+        else { document.getElementById('grid').innerHTML = "<p style='text-align:center; opacity:0.5;'>Players are picking fakes...</p>"; }
     });
 
     socket.on('startVoting', d => {
         document.getElementById('fake-ctrl').classList.add('hidden');
-        document.getElementById('clue-display').innerText = "VOTE!";
+        document.getElementById('clue-display').innerText = "VOTE FOR ORIGINAL!";
         if(myId !== d.drawerId) document.getElementById('vote-ctrl').classList.remove('hidden');
         render(d.options, (myId !== d.drawerId));
     });
@@ -205,9 +221,9 @@
     }
 
     function sendAction(t) {
-        if (!selectedImg) return alert("Select!");
+        if (!selectedImg) return alert("Select Image!");
         if (t === 'submitClue') {
-            const v = document.getElementById('clue-in').value; if(!v) return alert("Clue!");
+            const v = document.getElementById('clue-in').value; if(!v) return alert("Write Clue!");
             socket.emit('submitClue', { image: selectedImg, clue: v }); document.getElementById('draw-ctrl').classList.add('hidden');
         } else { 
             if(t === 'submitFake') myBait = selectedImg;
@@ -232,6 +248,7 @@
 
     socket.on('timerUpdate', t => { document.getElementById('timer').innerText = t; });
     socket.on('gameOver', d => { toggleModal('leaderboard-overlay'); document.getElementById('final-list').innerHTML = d.leaderboard.map(p => `<div>${p.name}: ${p.score}</div>`).join(''); });
+    socket.on('errorMsg', msg => { alert(msg); localStorage.removeItem('pix_room'); location.reload(); });
 </script>
 </body>
 </html>
