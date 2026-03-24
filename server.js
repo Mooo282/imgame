@@ -105,10 +105,18 @@ io.on('connection', (socket) => {
 
     function proceedToVoting(rId) {
         const room = rooms[rId];
-        if (room.gameState !== "FAKING") return;
+        if (!room || room.gameState !== "FAKING") return;
         room.gameState = "VOTING";
-        const options = shuffle([...new Set([room.correctImage, ...Object.values(room.fakeImages)])]);
-        io.to(rId).emit('startVoting', { options, drawerId: room.currentDrawerId });
+
+        // منطق الـ 6 صور على الأقل
+        let opts = [...new Set([room.correctImage, ...Object.values(room.fakeImages)])];
+        while (opts.length < 6 && opts.length < room.currentPool.length) {
+            let rand = room.currentPool[Math.floor(Math.random() * room.currentPool.length)];
+            if (!opts.includes(rand)) opts.push(rand);
+        }
+
+        const finalOptions = shuffle(opts);
+        io.to(rId).emit('startVoting', { options: finalOptions, drawerId: room.currentDrawerId });
         startTimer(rId, room.roundTimeLimit, () => finalizeRound(rId));
     }
 
@@ -124,13 +132,22 @@ io.on('connection', (socket) => {
         clearInterval(room.gameTimer);
         room.gameState = "RESULTS";
 
-        // Logic حساب النقاط
         let correct = 0, total = room.players.length - 1;
         for (let vId in room.votes) if (room.votes[vId] === room.correctImage) correct++;
         
+        // توزيع النقاط
         if (correct > 0 && correct < total) {
             room.scores[room.currentDrawerId] += (correct * 2);
             for (let vId in room.votes) if (room.votes[vId] === room.correctImage) room.scores[vId] += 3;
+        } else if (correct === 0 || correct === total) {
+            for (let vId in room.votes) if (room.votes[vId] === room.correctImage) room.scores[vId] += 2;
+        }
+
+        // نقاط التضليل
+        for (let vId in room.votes) {
+            for (let fId in room.fakeImages) {
+                if (room.votes[vId] === room.fakeImages[fId] && vId !== fId) room.scores[fId] += 1;
+            }
         }
 
         let voteDetails = {}, fakers = {};
@@ -144,7 +161,8 @@ io.on('connection', (socket) => {
         io.to(rId).emit('roundFinished', { correctImage: room.correctImage, scores: room.scores, voteDetails, fakers });
         
         setTimeout(() => {
-            if (room.players.some(id => room.scores[id] >= room.targetPoints)) {
+            const winner = room.players.find(id => room.scores[id] >= room.targetPoints);
+            if (winner) {
                 const lb = room.players.map(id => ({ name: room.playerNames[id], score: room.scores[id] })).sort((a,b) => b.score - a.score);
                 io.to(rId).emit('gameOver', { leaderboard: lb });
                 delete rooms[rId];
@@ -162,16 +180,21 @@ io.on('connection', (socket) => {
         }, 1000);
     }
 
-    socket.on('sendChat', m => io.to(socket.roomId).emit('newChat', { sender: rooms[socket.roomId].playerNames[socket.userId], text: m }));
+    socket.on('sendChat', m => {
+        const room = rooms[socket.roomId];
+        if(room) io.to(socket.roomId).emit('newChat', { sender: room.playerNames[socket.userId], text: m });
+    });
 
     socket.on('disconnect', () => {
         const rId = socket.roomId;
         if (rooms[rId]) {
             rooms[rId].players = rooms[rId].players.filter(id => id !== socket.userId);
-            if (rooms[rId].players.length === 0) delete rooms[rId];
-            else emitPlayerList(rId);
+            if (rooms[rId].players.length === 0) {
+                clearInterval(rooms[rId].gameTimer);
+                delete rooms[rId];
+            } else { emitPlayerList(rId); }
         }
     });
 });
 
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`PixDeception Server online at ${PORT}`));
